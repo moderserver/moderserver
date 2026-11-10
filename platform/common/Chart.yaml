@@ -1,0 +1,6 @@
+apiVersion: v2
+name: common
+description: Common Helm library chart for ModerServer platform infrastructure
+type: library
+version: 0.1.0
+icon: https://raw.githubusercontent.com/kubernetes/kubernetes/master/logo/logo.png

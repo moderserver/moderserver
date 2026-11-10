@@ -1,0 +1,34 @@
+# ModerServer Hardened K3s Configuration for Alpine Linux
+# Placed at /etc/rancher/k3s/config.yaml
+
+# Restrict kubeconfig permissions to root only (CIS 4.1.1)
+write-kubeconfig-mode: "0600"
+
+# Ditch useless default components (Gateway API replaces Traefik, NodePort/Gateway replaces ServiceLB)
+disable:
+  - traefik
+  - servicelb
+
+# Minimal footprint native CNI (VXLAN built-in to K3s binary, zero external CNI pods needed)
+flannel-backend: "vxlan"
+
+# Enable AES-GCM encryption of Kubernetes Secrets at rest
+secrets-encryption: true
+
+# Use structured KubeletConfiguration file
+kubelet-arg:
+  - "config=/etc/rancher/k3s/kubelet.config"
+
+# Valid API Server Hardening
+kube-apiserver-arg:
+  - "feature-gates=GatewayAPI=true"
+  - "anonymous-auth=false"
+  - "profiling=false"
+  - "service-account-lookup=true"
+  - "tls-min-version=VersionTLS12"
+  - "enable-admission-plugins=NodeRestriction,PodSecurity"
+
+# Networking ranges
+cluster-cidr: "10.42.0.0/16"
+service-cidr: "10.43.0.0/16"
+cluster-dns: "10.43.0.10"

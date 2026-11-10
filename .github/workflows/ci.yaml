@@ -1,0 +1,61 @@
+name: ModerServer CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Static Checks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Run Static Verifications
+        run: |
+          make verify-all
+
+  build:
+    name: Build (Appliance Image)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Build Bootable Alpine Image
+        run: |
+          make build-image
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: moderserver-installer-iso
+          path: _output/*.iso
+          retention-days: 1
+          if-no-files-found: ignore
+
+  e2e:
+    name: E2E (QEMU VM Test)
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils
+
+      - name: Run QEMU E2E Test
+        run: |
+          make test-e2e

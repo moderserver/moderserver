@@ -1,0 +1,42 @@
+#!/sbin/openrc-run
+# shellcheck shell=sh
+# Copyright 2026 ModerServer Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+description="K3s Kubernetes Distribution for ModerServer"
+supervisor="supervise-daemon"
+command="/usr/local/bin/k3s"
+command_args="server"
+output_log="/var/log/k3s.log"
+error_log="/var/log/k3s.log"
+
+depend() {
+    need net cgroups
+    after firewall
+}
+
+start_pre() {
+    # Ensure necessary kernel modules are loaded
+    modprobe -q overlay || true
+    modprobe -q br_netfilter || true
+
+    # Ensure required cgroup hierarchies are mounted
+    if [ ! -d /sys/fs/cgroup ]; then
+        eerror "cgroups hierarchy /sys/fs/cgroup not found. Ensure cgroup_enable=cpuset cgroup_memory=1 is set in bootloader."
+        return 1
+    fi
+
+    # Ensure directory structure exists
+    mkdir -p /etc/rancher/k3s /var/lib/rancher/k3s /var/log
+}

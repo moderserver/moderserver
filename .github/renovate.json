@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "onboarding": false,
+  "extends": [
+    "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "matchFileNames": ["hack/lib/common.sh"],
+      "groupName": "Developer Tooling",
+      "schedule": ["before 6am on monday"],
+      "automerge": false
+    },
+    {
+      "matchPackageNames": ["k3s-io/k3s"],
+      "groupName": "K3s Kubernetes Runtime",
+      "automerge": false
+    },
+    {
+      "matchPackageNames": ["alpine"],
+      "groupName": "Alpine Host OS",
+      "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^hack/lib/common\\.sh$",
+        "^bootstrap/setup-host\\.sh$",
+        "^os/build-image\\.sh$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n[A-Z0-9_]+_VERSION=\"(?<currentValue>[^\"]+?)\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^platform/components/upgrade/Dockerfile$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\nARG [A-Z0-9_]+_VERSION=(?<currentValue>[^\\s]+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^platform/components/upgrade/templates/os-plan\\.yaml$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*version:\\s*\"(?<currentValue>[^\"]+?)\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^platform/components/[^/]+/Chart\\.yaml$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\nappVersion:\\s*\"(?<currentValue>[^\"]+?)\""
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# ModerServer System Platform Configuration
+global:
+  domain: "home.arpa"
+
+gatewayApi:
+  enabled: true
+
+upgrade:
+  enabled: true

@@ -1,0 +1,2 @@
+# Default values for upgrade component.
+# Target runtime and OS versions are managed deterministically by the platform.

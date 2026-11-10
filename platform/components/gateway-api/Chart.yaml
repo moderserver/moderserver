@@ -1,0 +1,8 @@
+apiVersion: v2
+name: gateway-api
+description: Kubernetes Gateway API Standard Specifications and CRDs
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=kubernetes-sigs/gateway-api
+appVersion: "v1.7.0"
+icon: https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/main/site-src/images/logo/logo.png

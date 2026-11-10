@@ -1,0 +1,2 @@
+# Default values for gateway-api.
+# The Gateway API component manages cluster-scoped CustomResourceDefinitions.

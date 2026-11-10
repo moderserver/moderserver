@@ -1,0 +1,8 @@
+apiVersion: v2
+name: upgrade
+description: ModerServer Declarative OS & K3s Node Upgrade Component
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=k3s-io/k3s
+appVersion: "v1.37.2+k3s1"
+icon: https://raw.githubusercontent.com/rancher/system-upgrade-controller/master/assets/logo.png
