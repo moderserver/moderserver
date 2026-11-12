@@ -10,6 +10,10 @@ dependencies:
     version: 0.1.0
     repository: "file://../components/gateway-api"
     condition: gatewayAPI.enabled
+  - name: nginx-gateway-fabric
+    version: 0.1.0
+    repository: "file://../components/nginx-gateway-fabric"
+    condition: nginxGatewayFabric.enabled
   - name: system-upgrade-controller
     version: 0.1.0
     repository: "file://../components/system-upgrade-controller"

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: nginx-gateway-fabric
+description: NGINX Gateway Fabric for Kubernetes Gateway API data plane routing
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=nginx/nginx-gateway-fabric
+appVersion: "2.8.1"
+icon: https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/main/charts/nginx-gateway-fabric/chart-icon.png
+dependencies:
+  - name: common
+    version: 0.1.0
+    repository: "file://../../common"

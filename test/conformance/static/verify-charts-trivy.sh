@@ -38,7 +38,7 @@ for chart in ${CHARTS}; do
   (
     cd "${chart}"
     helm dependency update >/dev/null 2>&1 || true
-    helm template "${APP_NAME}-test" . > "${MANIFEST}"
+    helm template --include-crds "${APP_NAME}-test" . > "${MANIFEST}"
   )
   chmod 644 "${MANIFEST}"
 

@@ -45,6 +45,24 @@ done
 echo "--> Installing host prerequisites from ISO..." > /dev/ttyS0
 apk add --no-network --allow-untrusted --force-non-repository /media/cdrom/root/bootstrap/apks/*.apk > /dev/ttyS0 2>&1 || true
 
+# Format and mount storage disk at /var/lib/rancher if available
+TARGET_DISK=$(lsblk -d -n -o NAME,TYPE 2>/dev/null | awk '$2=="disk" && $1!~/(loop|sr|ram|fd)/ {print "/dev/"$1; exit}')
+if [ -n "${TARGET_DISK}" ] && [ -b "${TARGET_DISK}" ]; then
+  if ! blkid "${TARGET_DISK}" >/dev/null 2>&1; then
+    echo "--> Formatting storage disk ${TARGET_DISK}..." > /dev/ttyS0
+    mkfs.ext4 -F -q "${TARGET_DISK}" >/dev/null 2>&1 || true
+  fi
+  mkdir -p /var/lib/rancher
+  mount "${TARGET_DISK}" /var/lib/rancher >/dev/null 2>&1 || true
+fi
+
+# Pre-load platform container images into K3s containerd
+if [ -d /media/cdrom/root/bootstrap/images ]; then
+  echo "--> Staging pre-baked platform container images..." > /dev/ttyS0
+  mkdir -p /var/lib/rancher/k3s/agent/images
+  cp -f /media/cdrom/root/bootstrap/images/*.tar /var/lib/rancher/k3s/agent/images/ 2>/dev/null || true
+fi
+
 # 5. Run ModerServer host bootstrap
 if [ -f /media/cdrom/root/bootstrap/setup-host.sh ]; then
   echo "--> Running ModerServer host bootstrap..." > /dev/ttyS0

@@ -12,12 +12,13 @@ tls-san:
 disable:
   - traefik
   - servicelb
+  - gateway-api-crd
 
 # Minimal footprint native CNI (VXLAN built-in to K3s binary, zero external CNI pods needed)
 flannel-backend: "vxlan"
 
-# Use native snapshotter for universal filesystem compatibility
-snapshotter: "native"
+# Use overlayfs snapshotter for high performance and zero-copy layer sharing
+snapshotter: "overlayfs"
 
 # Enable AES-GCM encryption of Kubernetes Secrets at rest
 secrets-encryption: true

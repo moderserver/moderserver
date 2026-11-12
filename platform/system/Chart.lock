@@ -2,11 +2,14 @@ dependencies:
 - name: gateway-api
   repository: file://../components/gateway-api
   version: 0.1.0
+- name: nginx-gateway-fabric
+  repository: file://../components/nginx-gateway-fabric
+  version: 0.1.0
 - name: system-upgrade-controller
   repository: file://../components/system-upgrade-controller
   version: 0.1.0
 - name: upgrade
   repository: file://../components/upgrade
   version: 0.1.0
-digest: sha256:053fb2e9861418ed2627a20fa66e94006b8e915f9fdc579d33b71a20a73e3243
-generated: "2026-11-12T19:47:17.54030731+01:00"
+digest: sha256:4187a5bbcb3ff3ecb92eb04db44129e07151e3844443627c00da3b223e8693cd
+generated: "2026-11-12T20:34:07.134643313+01:00"

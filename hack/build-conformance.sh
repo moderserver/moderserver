@@ -19,6 +19,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 require_tool docker
 
+PUSH="${PUSH:-false}"
+if [[ "${1:-}" == "--push" ]]; then
+  PUSH="true"
+fi
+
 IMAGE_TAG="${REGISTRY:-ghcr.io/moderserver}/conformance:${CONFORMANCE_TAG:-latest}"
 
 log_info "Building ModerServer Conformance container image (${IMAGE_TAG})..."
@@ -27,5 +32,10 @@ docker build \
   -f "${CORE_ROOT}/test/conformance/Dockerfile" \
   -t "${IMAGE_TAG}" \
   "${CORE_ROOT}"
+
+if [[ "${PUSH}" == "true" ]]; then
+  log_info "Pushing Conformance image: ${IMAGE_TAG}..."
+  docker push "${IMAGE_TAG}"
+fi
 
 log_pass "Successfully built Conformance image: ${IMAGE_TAG}"

@@ -1,0 +1,3 @@
+# Default values for nginx-gateway-fabric.
+# Controller version, image, and data plane configurations are managed deterministically by the platform.
+enabled: true

@@ -5,6 +5,9 @@ global:
 gatewayAPI:
   enabled: true
 
+nginxGatewayFabric:
+  enabled: true
+
 systemUpgradeController:
   enabled: true
 

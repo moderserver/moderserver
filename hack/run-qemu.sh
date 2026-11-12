@@ -206,7 +206,7 @@ if [[ "${API_READY}" != "true" ]]; then
 fi
 
 log_pass "ModerServer QEMU Virtual Machine is online!"
-sleep 5
+sleep 3
 
 # Deploy platform layer
 log_info "Deploying ModerServer Platform Layer (platform/system)..."

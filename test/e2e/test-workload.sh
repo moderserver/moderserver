@@ -42,7 +42,12 @@ kubectl run "${TEST_POD}" \
   >/dev/null 2>&1
 
 # Wait for pod to reach Running state
-kubectl wait --for=condition=Ready pod/"${TEST_POD}" --timeout=60s
+if ! kubectl wait --for=condition=Ready pod/"${TEST_POD}" --timeout=120s; then
+  echo "FAIL: Pod ${TEST_POD} did not become ready within timeout." >&2
+  kubectl describe pod "${TEST_POD}" >&2 || true
+  kubectl delete pod "${TEST_POD}" >/dev/null 2>&1 || true
+  exit 1
+fi
 
 # Verify DNS resolution in pod logs
 sleep 2

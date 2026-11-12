@@ -23,8 +23,14 @@ The foundational Alpine Linux and lightweight Kubernetes (K3s) distribution for 
 From the `moderserver/` directory:
 
 ```bash
-# Run all repository static verifications (license headers, shellcheck, yamllint, renovate, actionlint)
+# Run all repository static verifications (license headers, shellcheck, actionlint, yamllint, renovate, gitleaks)
 make verify-all
+
+# Build all platform components, appliance ISO, and conformance tools
+make build-all
+
+# Run interactive QEMU appliance virtual machine (Ctrl+C to stop)
+make run-qemu
 
 # Run Static Conformance against platform components
 make test-conformance
@@ -35,14 +41,8 @@ make test-conformance-runtime
 # Run E2E node infrastructure test
 make test-e2e
 
-# Build official Conformance container image
-make build-conformance
-
 # Inspect discovered dependencies and check for available updates locally
 ./hack/run-renovate.sh
-
-# Build bootable installer ISO
-make build-image
 
 # Run standalone host preparation on an Alpine machine
 make setup-host

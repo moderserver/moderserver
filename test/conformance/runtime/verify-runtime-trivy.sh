@@ -22,11 +22,6 @@ require_tool kubectl
 NAMESPACE="${1:-default}"
 SELECTOR="${2:-}"
 
-EXTRA_ARGS=()
-if [[ -n "${SELECTOR}" ]]; then
-  EXTRA_ARGS+=("--selector" "${SELECTOR}")
-fi
-
 TMP_KUBECONFIG=$(mktemp)
 kubectl config view --raw > "${TMP_KUBECONFIG}"
 chmod 644 "${TMP_KUBECONFIG}"
@@ -42,7 +37,6 @@ docker run --rm \
   k8s \
   --kubeconfig /tmp/kubeconfig \
   --include-namespaces "${NAMESPACE}" \
-  "${EXTRA_ARGS[@]}" \
   --report summary \
   --scanners misconfig \
   --severity CRITICAL,HIGH \

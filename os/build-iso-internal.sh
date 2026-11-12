@@ -45,7 +45,7 @@ chmod -R u+w "${WORK_DIR}/iso-extract"
 echo "--> Pre-baking host runtime packages into bootstrap..."
 mkdir -p "${WORK_DIR}/iso-extract/root/bootstrap/apks"
 apk fetch --no-cache -R -o "${WORK_DIR}/iso-extract/root/bootstrap/apks" \
-  curl ca-certificates iptables ebtables ip6tables cgroup-tools wireguard-tools chrony acpid zram-init >/dev/null 2>&1 || true
+  curl ca-certificates iptables ebtables ip6tables cgroup-tools wireguard-tools chrony acpid zram-init e2fsprogs >/dev/null 2>&1 || true
 
 echo "--> Injecting ModerServer OS unattended answerfile and bootstrap manifests..."
 mkdir -p "${WORK_DIR}/iso-extract/etc" "${WORK_DIR}/iso-extract/root/bootstrap" "${WORK_DIR}/iso-extract/root/os/sysctl.d"
@@ -53,6 +53,12 @@ cp "${CORE_ROOT}/os/answers.conf" "${WORK_DIR}/iso-extract/etc/answers.conf"
 cp -r "${CORE_ROOT}/bootstrap"/* "${WORK_DIR}/iso-extract/root/bootstrap/"
 cp -r "${CORE_ROOT}/os/sysctl.d"/* "${WORK_DIR}/iso-extract/root/os/sysctl.d/"
 cp "${K3S_CACHE}" "${WORK_DIR}/iso-extract/root/bootstrap/k3s"
+
+mkdir -p "${WORK_DIR}/iso-extract/root/bootstrap/images"
+if [ -d "${CORE_ROOT}/_output/images" ] && [ "$(ls -A "${CORE_ROOT}/_output/images" 2>/dev/null)" ]; then
+  echo "--> Pre-baking platform container images into bootstrap..."
+  cp "${CORE_ROOT}/_output/images"/*.tar "${WORK_DIR}/iso-extract/root/bootstrap/images/" 2>/dev/null || true
+fi
 
 echo "--> Packaging ModerServer automated startup overlay..."
 cp -r "${CORE_ROOT}/os/overlay"/* "${WORK_DIR}/ovl/"

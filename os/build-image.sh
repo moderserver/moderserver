@@ -29,6 +29,11 @@ CORE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUTPUT_DIR="${CORE_ROOT}/_output"
 mkdir -p "${OUTPUT_DIR}"
 
+if [ ! -d "${OUTPUT_DIR}/images" ] || [ -z "$(ls -A "${OUTPUT_DIR}/images" 2>/dev/null)" ]; then
+  echo "--> Staging platform component images in ${OUTPUT_DIR}/images..."
+  "${CORE_ROOT}/hack/build-components.sh" --save-dir "${OUTPUT_DIR}/images"
+fi
+
 IMAGE_OUT="${OUTPUT_DIR}/moderserver-alpine-${ALPINE_VERSION}.iso"
 
 echo "==> Building ModerServer Alpine Appliance ISO (v${ALPINE_VERSION})..."
