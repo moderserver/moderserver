@@ -1,2 +1,9 @@
 # Default values for upgrade component.
 # Target runtime and OS versions are managed deterministically by the platform.
+enabled: true
+
+plans:
+  k3s:
+    enabled: true
+  os:
+    enabled: true

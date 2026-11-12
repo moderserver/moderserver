@@ -5,8 +5,6 @@ The foundational Alpine Linux and lightweight Kubernetes (K3s) distribution for 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Manifesto](https://img.shields.io/badge/Manifesto-Read-green.svg)](https://github.com/ModerServer/.github/blob/main/MANIFESTO.md)
 
----
-
 ## Architecture & Responsibilities
 
 1. **Lightweight Alpine Linux OS (<100MB RAM Idle)**:
@@ -25,14 +23,20 @@ The foundational Alpine Linux and lightweight Kubernetes (K3s) distribution for 
 From the `moderserver/` directory:
 
 ```bash
-# Run all static verifications (license headers, shellcheck, yamllint, renovate, actionlint)
+# Run all repository static verifications (license headers, shellcheck, yamllint, renovate, actionlint)
 make verify-all
 
-# Run E2E test suite via QEMU virtual machine harness
+# Run Static Conformance against platform components
+make test-conformance
+
+# Run live Runtime Conformance against deployed platform
+make test-conformance-runtime
+
+# Run E2E node infrastructure test
 make test-e2e
 
-# Run E2E test suite directly against any active cluster (bare metal, k3d, remote)
-./test/e2e/run.sh [--kubeconfig <path>]
+# Build official Conformance container image
+make build-conformance
 
 # Inspect discovered dependencies and check for available updates locally
 ./hack/run-renovate.sh

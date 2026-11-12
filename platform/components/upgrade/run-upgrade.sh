@@ -19,7 +19,7 @@ set -euo pipefail
 # container mounting the host root filesystem at /host.
 
 HOST_ROOT="${HOST_ROOT:-/host}"
-TARGET_OS_VERSION="${TARGET_OS_VERSION:-3.24}"
+TARGET_OS_VERSION="${TARGET_OS_VERSION:-3.24.4}"
 
 echo "==> ModerServer GitOps OS Upgrade Runner"
 echo "--> Target Alpine OS Version: ${TARGET_OS_VERSION}"
@@ -30,10 +30,11 @@ if [ ! -d "${HOST_ROOT}/etc/apk" ]; then
 fi
 
 # 1. Update host repository pin to target release stream
-echo "--> Pinning host repositories to Alpine v${TARGET_OS_VERSION}..."
+TARGET_BRANCH="${TARGET_OS_VERSION%.*}"
+echo "--> Pinning host repositories to Alpine v${TARGET_BRANCH} (target release: ${TARGET_OS_VERSION})..."
 cat << EOF > "${HOST_ROOT}/etc/apk/repositories"
-https://dl-cdn.alpinelinux.org/alpine/v${TARGET_OS_VERSION}/main
-https://dl-cdn.alpinelinux.org/alpine/v${TARGET_OS_VERSION}/community
+https://dl-cdn.alpinelinux.org/alpine/v${TARGET_BRANCH}/main
+https://dl-cdn.alpinelinux.org/alpine/v${TARGET_BRANCH}/community
 EOF
 
 # 2. Perform package upgrades inside host chroot

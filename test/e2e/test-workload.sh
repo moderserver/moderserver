@@ -20,13 +20,25 @@ export KUBECONFIG
 
 echo "--> [E2E] Verifying workload execution and cluster DNS..."
 
+# Wait for default ServiceAccount to be created by the controller manager
+for _ in $(seq 1 30); do
+  if kubectl get serviceaccount default >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
 TEST_POD="e2e-dns-check"
 kubectl delete pod "${TEST_POD}" --ignore-not-found=true >/dev/null 2>&1
 
+# renovate: datasource=docker depName=alpine
+TEST_ALPINE_VERSION="3.24.4"
+TEST_IMAGE="alpine:${TEST_ALPINE_VERSION}"
+
 kubectl run "${TEST_POD}" \
-  --image="alpine:3.21" \
+  --image="${TEST_IMAGE}" \
   --restart=Never \
-  --overrides='{"spec":{"automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true,"runAsUser":1000,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"dns","image":"alpine:3.21","command":["sh","-c","nslookup kubernetes.default.svc.cluster.local && sleep 3600"],"securityContext":{"readOnlyRootFilesystem":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' \
+  --overrides='{"spec":{"automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true,"runAsUser":1000,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"dns","image":"'"${TEST_IMAGE}"'","command":["sh","-c","until nslookup kubernetes.default.svc.cluster.local; do sleep 1; done && sleep 3600"],"securityContext":{"readOnlyRootFilesystem":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' \
   >/dev/null 2>&1
 
 # Wait for pod to reach Running state

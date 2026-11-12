@@ -2,8 +2,8 @@
 global:
   domain: "home.arpa"
 
-gatewayApi:
+gatewayAPI:
   enabled: true
 
 upgrade:
-  enabled: true
+  enabled: false

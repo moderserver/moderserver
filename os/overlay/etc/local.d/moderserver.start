@@ -1,0 +1,75 @@
+#!/bin/sh
+# Copyright 2026 ModerServer Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -eu
+
+echo "===MODERSERVER_BOOT_STARTED===" > /dev/ttyS0
+
+# Prevent multiple executions
+if [ -f /tmp/moderserver-boot.done ]; then
+  exit 0
+fi
+touch /tmp/moderserver-boot.done
+
+# 1. Set valid appliance hostname
+hostname moderserver
+echo "moderserver" > /etc/hostname
+
+# 2. Mount kernel modules
+rc-service modloop start >/dev/null 2>&1 || true
+modprobe overlay >/dev/null 2>&1 || true
+modprobe br_netfilter >/dev/null 2>&1 || true
+
+# 3. Bring up loopback and dynamic interface networking via DHCP
+ip link set lo up >/dev/null 2>&1 || true
+for iface in $(ls /sys/class/net 2>/dev/null); do
+  if [ "${iface}" != "lo" ] && [ ! -d "/sys/class/net/${iface}/wireless" ]; then
+    ip link set "${iface}" up >/dev/null 2>&1 || true
+    udhcpc -i "${iface}" -s /usr/share/udhcpc/default.script -t 3 -q >/dev/null 2>&1 || true
+  fi
+done
+
+# 4. Install pre-baked runtime packages from local ISO
+echo "--> Installing host prerequisites from ISO..." > /dev/ttyS0
+apk add --no-network --allow-untrusted --force-non-repository /media/cdrom/root/bootstrap/apks/*.apk > /dev/ttyS0 2>&1 || true
+
+# 5. Run ModerServer host bootstrap
+if [ -f /media/cdrom/root/bootstrap/setup-host.sh ]; then
+  echo "--> Running ModerServer host bootstrap..." > /dev/ttyS0
+  /bin/sh /media/cdrom/root/bootstrap/setup-host.sh > /dev/ttyS0 2>&1 || true
+fi
+
+# 6. Mount cgroups and start K3s
+mkdir -p /sys/fs/cgroup
+mount -t cgroup2 none /sys/fs/cgroup 2>/dev/null || true
+rc-service cgroups start >/dev/null 2>&1 || true
+
+if [ -x /etc/init.d/k3s ]; then
+  rc-service k3s start >/dev/null 2>&1 || nohup /usr/local/bin/k3s server > /var/log/k3s.log 2>&1 &
+elif [ -x /usr/local/bin/k3s ]; then
+  nohup /usr/local/bin/k3s server > /var/log/k3s.log 2>&1 &
+fi
+
+# 7. Wait until K3s generates kubeconfig and emit over serial
+echo "--> Waiting for K3s initialization..." > /dev/ttyS0
+until [ -s /etc/rancher/k3s/k3s.yaml ]; do
+  sleep 1
+done
+sleep 2
+
+# 8. Emit kubeconfig over serial
+echo "===BEGIN_MODERSERVER_KUBECONFIG===" > /dev/ttyS0
+cat /etc/rancher/k3s/k3s.yaml > /dev/ttyS0
+echo "===END_MODERSERVER_KUBECONFIG===" > /dev/ttyS0

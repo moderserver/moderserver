@@ -20,10 +20,18 @@ export KUBECONFIG
 
 echo "--> [E2E] Verifying Kubernetes node readiness..."
 
-# 1. Wait for at least one node to report Ready
+# 1. Wait for at least one node to be registered by kubelet
+for _ in $(seq 1 60); do
+  if [ -n "$(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null)" ]; then
+    break
+  fi
+  sleep 2
+done
+
+# 2. Wait for all nodes to report Ready
 kubectl wait --for=condition=Ready nodes --all --timeout=120s
 
-# 2. Assert node details
+# 3. Assert node details
 NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
 NODE_STATUS=$(kubectl get nodes -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}')
 KUBELET_VERSION=$(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.kubeletVersion}')

@@ -4,6 +4,11 @@
   "extends": [
     "config:recommended"
   ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**"
+  ],
   "packageRules": [
     {
       "matchFileNames": ["hack/lib/common.sh"],
@@ -28,7 +33,10 @@
       "fileMatch": [
         "^hack/lib/common\\.sh$",
         "^bootstrap/setup-host\\.sh$",
-        "^os/build-image\\.sh$"
+        "^os/build-image\\.sh$",
+        "^test/e2e/test-workload\\.sh$",
+        "^hack/run-qemu\\.sh$",
+        "^test/conformance/static/verify-charts-kubeconform\\.sh$"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n[A-Z0-9_]+_VERSION=\"(?<currentValue>[^\"]+?)\""
@@ -36,7 +44,10 @@
     },
     {
       "customType": "regex",
-      "fileMatch": ["^platform/components/upgrade/Dockerfile$"],
+      "fileMatch": [
+        "^platform/components/upgrade/Dockerfile$",
+        "^test/conformance/Dockerfile$"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\nARG [A-Z0-9_]+_VERSION=(?<currentValue>[^\\s]+)"
       ]

@@ -15,54 +15,31 @@
 
 set -euo pipefail
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
-require_tool qemu-system-x86_64
-require_tool qemu-img
-require_tool curl
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/common.sh"
 
-CACHE_DIR="/tmp/moderserver-qemu-cache"
-mkdir -p "${CACHE_DIR}"
+CLUSTER_NAME="moderserver-e2e-cluster"
+export CLUSTER_NAME
 
-TEST_DIR=$(mktemp -d /tmp/moderserver-qemu-XXXXXX)
+STOP_ON_EXIT=false
+
 cleanup() {
-  log_info "Cleaning up ephemeral QEMU test environment..."
-  rm -rf "${TEST_DIR}"
+  if [[ "${STOP_ON_EXIT}" == "true" ]]; then
+    log_info "Stopping E2E test cluster..."
+    "${SCRIPT_DIR}/run-qemu.sh" --stop >/dev/null 2>&1 || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
-VIRT_KERNEL="${CACHE_DIR}/vmlinuz-virt"
-VIRT_INITFS="${CACHE_DIR}/initramfs-virt"
-NETBOOT_BASE="https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/netboot"
-
-if [[ ! -f "${VIRT_KERNEL}" ]]; then
-  log_info "Downloading Alpine netboot kernel for QEMU test..."
-  curl -sfL "${NETBOOT_BASE}/vmlinuz-virt" -o "${VIRT_KERNEL}"
+if [[ ! -f "${KUBECONFIG:-}" ]]; then
+  log_info "Bootstrapping ModerServer cluster via hack/run-qemu.sh..."
+  "${SCRIPT_DIR}/run-qemu.sh" --daemon
+  KUBECONFIG_PATH=$("${SCRIPT_DIR}/run-qemu.sh" --kubeconfig)
+  export KUBECONFIG="${KUBECONFIG_PATH}"
+  STOP_ON_EXIT=true
 fi
 
-if [[ ! -f "${VIRT_INITFS}" ]]; then
-  log_info "Downloading Alpine netboot initramfs for QEMU test..."
-  curl -sfL "${NETBOOT_BASE}/initramfs-virt" -o "${VIRT_INITFS}"
-fi
+log_info "Executing E2E node, security, and workload isolation suite..."
+"${CORE_ROOT}/test/e2e/run.sh" --kubeconfig "${KUBECONFIG}"
 
-log_info "Creating 10GB virtual test disk..."
-qemu-img create -f qcow2 "${TEST_DIR}/disk.qcow2" 10G >/dev/null
-
-log_info "Preparing unattended overlay and answerfile..."
-mkdir -p "${TEST_DIR}/overlay"
-cp "${CORE_ROOT}/os/answers.conf" "${TEST_DIR}/overlay/answers.conf"
-
-KVM_FLAGS=()
-if [[ -w /dev/kvm ]]; then
-  log_info "Hardware virtualization (/dev/kvm) detected. Enabling KVM acceleration..."
-  KVM_FLAGS=("-enable-kvm" "-cpu" "host")
-fi
-
-log_info "Spawning QEMU harness (4GB RAM, 2 vCPUs) to execute test/e2e/run.sh..."
-# When QEMU environment is ready, it delegates to the decoupled test suite
-if [[ -f "${KUBECONFIG:-}" ]]; then
-  "${CORE_ROOT}/test/e2e/run.sh" --kubeconfig "${KUBECONFIG}"
-else
-  log_info "QEMU harness validated. Run with --kubeconfig or against active cluster to execute live assertions."
-fi
-
-echo "==> [PASS] QEMU test harness and E2E suite executed successfully."
+log_pass "E2E infrastructure assertions executed successfully."

@@ -16,7 +16,13 @@
 set -euo pipefail
 
 # renovate: datasource=docker depName=alpine
-ALPINE_VERSION="3.24"
+ALPINE_VERSION="3.24.4"
+
+# renovate: datasource=docker depName=alpine
+ALPINE_ISO_VERSION="3.24.4"
+
+# renovate: datasource=github-releases depName=k3s-io/k3s
+K3S_VERSION="v1.37.2+k3s1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CORE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -25,25 +31,17 @@ mkdir -p "${OUTPUT_DIR}"
 
 IMAGE_OUT="${OUTPUT_DIR}/moderserver-alpine-${ALPINE_VERSION}.iso"
 
-echo "==> Building ModerServer Alpine Installer ISO (v${ALPINE_VERSION})..."
+echo "==> Building ModerServer Alpine Appliance ISO (v${ALPINE_VERSION})..."
 
-# Use official Alpine builder container
 docker run --rm --privileged \
   -v "${CORE_ROOT}:${CORE_ROOT}" \
   -v "${OUTPUT_DIR}:/output" \
+  -e "CORE_ROOT=${CORE_ROOT}" \
+  -e "IMAGE_OUT=/output/moderserver-alpine-${ALPINE_VERSION}.iso" \
+  -e "ALPINE_ISO_VERSION=${ALPINE_ISO_VERSION}" \
+  -e "K3S_VERSION=${K3S_VERSION}" \
   -w "${CORE_ROOT}" \
-  "alpine:${ALPINE_VERSION}" sh -c '
-    apk add --no-cache xorriso mtools
-    echo "--> Packaging unattended answers and bootstrap into overlay..."
-    mkdir -p /tmp/overlay/etc /tmp/overlay/root
-    cp "'"${SCRIPT_DIR}"'/answers.conf" /tmp/overlay/etc/answers.conf
-    cp -r "'"${CORE_ROOT}"'/bootstrap" /tmp/overlay/root/bootstrap
-    echo "--> Generating bootable installer ISO..."
-    xorriso -as mkisofs \
-      -r -V "MODERSERVER" \
-      -o "/output/moderserver-alpine-'"${ALPINE_VERSION}"'.iso" \
-      /tmp/overlay
-    echo "==> [PASS] Installer rootfs and ISO prepared."
-  '
+  "alpine:${ALPINE_VERSION}" \
+  "${SCRIPT_DIR}/build-iso-internal.sh"
 
-echo "==> [PASS] Generated installer ISO at: ${IMAGE_OUT}"
+echo "==> [PASS] Generated bootable appliance ISO at: ${IMAGE_OUT}"

@@ -1,3 +1,4 @@
+{{- if and .Values.enabled .Values.plans.k3s.enabled }}
 apiVersion: upgrade.cattle.io/v1
 kind: Plan
 metadata:
@@ -9,7 +10,7 @@ spec:
   concurrency: 1
   nodeSelector:
     matchExpressions:
-      - key: node-role.kubernetes.io/master
+      - key: node-role.kubernetes.io/control-plane
         operator: In
         values: ["true"]
   serviceAccountName: system-upgrade
@@ -20,3 +21,4 @@ spec:
   version: {{ .Chart.AppVersion | quote }}
   upgrade:
     image: "rancher/k3s-upgrade"
+{{- end }}

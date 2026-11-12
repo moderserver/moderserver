@@ -32,4 +32,7 @@ log_info "==> Step 4: Checking YAML formatting with yamllint..."
 log_info "==> Step 5: Checking Renovate configuration..."
 "${HACK_DIR}/verify-renovate.sh"
 
+log_info "==> Step 6: Checking for secret leaks with Gitleaks..."
+"${HACK_DIR}/verify-gitleaks.sh"
+
 log_pass "All core static verifications passed successfully."

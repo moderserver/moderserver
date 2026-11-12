@@ -4,6 +4,10 @@
 # Restrict kubeconfig permissions to root only (CIS 4.1.1)
 write-kubeconfig-mode: "0600"
 
+tls-san:
+  - "127.0.0.1"
+  - "localhost"
+
 # Ditch useless default components (Gateway API replaces Traefik, NodePort/Gateway replaces ServiceLB)
 disable:
   - traefik
@@ -11,6 +15,9 @@ disable:
 
 # Minimal footprint native CNI (VXLAN built-in to K3s binary, zero external CNI pods needed)
 flannel-backend: "vxlan"
+
+# Use native snapshotter for universal filesystem compatibility
+snapshotter: "native"
 
 # Enable AES-GCM encryption of Kubernetes Secrets at rest
 secrets-encryption: true
@@ -21,8 +28,6 @@ kubelet-arg:
 
 # Valid API Server Hardening
 kube-apiserver-arg:
-  - "feature-gates=GatewayAPI=true"
-  - "anonymous-auth=false"
   - "profiling=false"
   - "service-account-lookup=true"
   - "tls-min-version=VersionTLS12"

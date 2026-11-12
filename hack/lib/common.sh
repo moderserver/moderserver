@@ -26,15 +26,53 @@ export PATH="${OUTPUT_BIN}:${PATH}"
 ACTIONLINT_VERSION="1.7.12"
 ACTIONLINT_IMAGE="rhysd/actionlint:${ACTIONLINT_VERSION}"
 
+# renovate: datasource=docker depName=ghcr.io/gitleaks/gitleaks
+GITLEAKS_VERSION="v8.30.1"
+GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION}"
+
+# renovate: datasource=docker depName=hadolint/hadolint
+HADOLINT_VERSION="v2.15.1"
+HADOLINT_IMAGE="hadolint/hadolint:${HADOLINT_VERSION}"
+
+# renovate: datasource=docker depName=stackrox/kube-linter
+KUBE_LINTER_VERSION="v0.8.3"
+KUBE_LINTER_IMAGE="stackrox/kube-linter:${KUBE_LINTER_VERSION}"
+
+# renovate: datasource=docker depName=quay.io/kubescape/kubescape-cli
+KUBESCAPE_VERSION="v4.0.20"
+KUBESCAPE_IMAGE="quay.io/kubescape/kubescape-cli:${KUBESCAPE_VERSION}"
+
+# renovate: datasource=github-releases depName=FairwindsOps/polaris
+POLARIS_VERSION="v10.2.6"
+POLARIS_IMAGE="us-docker.pkg.dev/fairwinds-ops/oss/polaris:${POLARIS_VERSION}"
+
+# renovate: datasource=docker depName=derailed/popeye
+POPEYE_VERSION="v0.22.1"
+POPEYE_IMAGE="derailed/popeye:${POPEYE_VERSION}"
+
 # renovate: datasource=docker depName=koalaman/shellcheck
 SHELLCHECK_VERSION="v0.11.0"
 SHELLCHECK_IMAGE="koalaman/shellcheck:${SHELLCHECK_VERSION}"
+
+# renovate: datasource=docker depName=aquasec/trivy
+TRIVY_VERSION="0.76.2"
+TRIVY_IMAGE="aquasec/trivy:${TRIVY_VERSION}"
+
+# renovate: datasource=docker depName=ghcr.io/yannh/kubeconform
+KUBECONFORM_VERSION="v0.8.0"
+KUBECONFORM_IMAGE="ghcr.io/yannh/kubeconform:${KUBECONFORM_VERSION}"
 
 # renovate: datasource=pypi depName=yamllint
 YAMLLINT_VERSION="1.38.0"
 
 # renovate: datasource=github-releases depName=k3s-io/k3s
 K3S_VERSION="v1.37.2+k3s1"
+
+# renovate: datasource=github-releases depName=kubernetes-sigs/gateway-api
+GATEWAY_API_CRD_VERSION="v1.7.0"
+
+# renovate: datasource=github-releases depName=kubernetes/kubernetes
+K8S_TARGET_VERSION="1.37.2"
 
 # Colors for terminal output
 COLOR_INFO="\033[36m"

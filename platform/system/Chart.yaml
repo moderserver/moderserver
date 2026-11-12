@@ -9,7 +9,7 @@ dependencies:
   - name: gateway-api
     version: 0.1.0
     repository: "file://../components/gateway-api"
-    condition: gatewayApi.enabled
+    condition: gatewayAPI.enabled
   - name: upgrade
     version: 0.1.0
     repository: "file://../components/upgrade"
