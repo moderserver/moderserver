@@ -1,0 +1,3 @@
+# Default values for system-upgrade-controller.
+# Controller version, image, and runtime resources are managed deterministically by the platform.
+enabled: true

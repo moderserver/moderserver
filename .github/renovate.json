@@ -45,7 +45,7 @@
     {
       "customType": "regex",
       "fileMatch": [
-        "^platform/components/upgrade/Dockerfile$",
+        "^platform/components/[^/]+/Dockerfile$",
         "^test/conformance/Dockerfile$"
       ],
       "matchStrings": [
@@ -64,6 +64,15 @@
       "fileMatch": ["^platform/components/[^/]+/Chart\\.yaml$"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\nappVersion:\\s*\"(?<currentValue>[^\"]+?)\""
+      ]
+    },
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^platform/components/system-upgrade-controller/templates/configmap\\.yaml$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*SYSTEM_UPGRADE_JOB_KUBECTL_IMAGE:\\s*\"[^:\"]+:(?<currentValue>[^\"]+?)\""
       ]
     }
   ]

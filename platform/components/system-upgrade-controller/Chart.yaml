@@ -1,0 +1,12 @@
+apiVersion: v2
+name: system-upgrade-controller
+description: Rancher System Upgrade Controller for automated K3s and OS host upgrades
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=rancher/system-upgrade-controller
+appVersion: "v0.21.0"
+icon: https://raw.githubusercontent.com/rancher/system-upgrade-controller/master/assets/logo.png
+dependencies:
+  - name: common
+    version: 0.1.0
+    repository: "file://../../common"

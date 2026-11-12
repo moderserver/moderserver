@@ -2,8 +2,11 @@ dependencies:
 - name: gateway-api
   repository: file://../components/gateway-api
   version: 0.1.0
+- name: system-upgrade-controller
+  repository: file://../components/system-upgrade-controller
+  version: 0.1.0
 - name: upgrade
   repository: file://../components/upgrade
   version: 0.1.0
-digest: sha256:07af360184792df34d4ffeb7b42ffd40aa46703b027ac3177c4fac65ec352b67
-generated: "2026-11-10T11:58:08.036687197+01:00"
+digest: sha256:053fb2e9861418ed2627a20fa66e94006b8e915f9fdc579d33b71a20a73e3243
+generated: "2026-11-12T19:47:17.54030731+01:00"

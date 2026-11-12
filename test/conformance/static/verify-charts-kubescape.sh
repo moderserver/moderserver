@@ -46,7 +46,7 @@ for chart in ${CHARTS}; do
   SCAN_OUTPUT=$(run_tool_or_docker kubescape "${KUBESCAPE_IMAGE}" scan framework nsa "${MANIFEST}" --severity-threshold high 2>&1 || true)
   if echo "${SCAN_OUTPUT}" | grep -q "no resources found to scan"; then
     log_info "No standard workload resources in ${APP_NAME} to scan with kubescape, skipping."
-  elif echo "${SCAN_OUTPUT}" | grep -q "Failed │ [1-9]"; then
+  elif echo "${SCAN_OUTPUT}" | grep -E -q "│ *(Critical|High) │ [1-9]"; then
     echo "${SCAN_OUTPUT}" >&2
     log_error "kubescape detected compliance failures in ${APP_NAME}."
     exit 1

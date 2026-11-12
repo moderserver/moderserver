@@ -5,5 +5,8 @@ global:
 gatewayAPI:
   enabled: true
 
+systemUpgradeController:
+  enabled: true
+
 upgrade:
   enabled: false

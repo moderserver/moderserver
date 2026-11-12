@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.names.fullname" . }}
+  namespace: system-upgrade
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+    upgrade.cattle.io/controller: system-upgrade-controller
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "common.labels.matchLabels" . | nindent 6 }}
+      upgrade.cattle.io/controller: system-upgrade-controller
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels.standard" . | nindent 8 }}
+        upgrade.cattle.io/controller: system-upgrade-controller
+    spec:
+      serviceAccountName: system-upgrade
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - name: system-upgrade-controller
+          image: "ghcr.io/moderserver/system-upgrade-controller:{{ .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            {{- include "common.security.container" . | nindent 12 }}
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          env:
+            - name: SYSTEM_UPGRADE_CONTROLLER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['upgrade.cattle.io/controller']
+            - name: SYSTEM_UPGRADE_CONTROLLER_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SYSTEM_UPGRADE_CONTROLLER_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          envFrom:
+            - configMapRef:
+                name: default-controller-env
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: etc-ssl
+              mountPath: /etc/ssl
+              readOnly: true
+            - name: etc-pki
+              mountPath: /etc/pki
+              readOnly: true
+            - name: etc-ca-certificates
+              mountPath: /etc/ca-certificates
+              readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: etc-ssl
+          hostPath:
+            path: /etc/ssl
+            type: DirectoryOrCreate
+        - name: etc-pki
+          hostPath:
+            path: /etc/pki
+            type: DirectoryOrCreate
+        - name: etc-ca-certificates
+          hostPath:
+            path: /etc/ca-certificates
+            type: DirectoryOrCreate
