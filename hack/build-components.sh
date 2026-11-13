@@ -63,7 +63,9 @@ build_component() {
   local comp_name
   comp_name=$(basename "${comp_dir}")
 
-  if [[ ! -f "${comp_dir}/Dockerfile" ]]; then
+  local dockerfiles
+  mapfile -t dockerfiles < <(find "${comp_dir}" -maxdepth 1 -type f -name "Dockerfile*" ! -name "*.dockerignore" | sort)
+  if [[ ${#dockerfiles[@]} -eq 0 ]]; then
     return 0
   fi
 
@@ -72,22 +74,32 @@ build_component() {
     version=$(awk '/^appVersion:/ {print $2}' "${comp_dir}/Chart.yaml" | tr -d '"' | tr '+' '-')
   fi
 
-  local image_tag="${REGISTRY}/${comp_name}:${version}"
-  log_info "Building image: ${image_tag} from ${comp_dir}..."
-  docker build -t "${image_tag}" "${comp_dir}"
+  for df in "${dockerfiles[@]}"; do
+    local suffix
+    suffix=$(basename "${df}")
+    local image_name="${comp_name}"
+    if [[ "${suffix}" == Dockerfile.* ]]; then
+      local sub_name="${suffix#Dockerfile.}"
+      image_name="${comp_name}-${sub_name}"
+    fi
 
-  if [[ -n "${SAVE_DIR}" ]]; then
-    local tar_path="${SAVE_DIR}/${comp_name}.tar"
-    log_info "Saving image archive to ${tar_path}..."
-    docker save "${image_tag}" -o "${tar_path}"
-  fi
+    local image_tag="${REGISTRY}/${image_name}:${version}"
+    log_info "Building image: ${image_tag} from ${df}..."
+    docker build -f "${df}" -t "${image_tag}" "${comp_dir}"
 
-  if [[ "${PUSH}" == "true" ]]; then
-    log_info "Pushing image: ${image_tag}..."
-    docker push "${image_tag}"
-  fi
+    if [[ -n "${SAVE_DIR}" ]]; then
+      local tar_path="${SAVE_DIR}/${image_name}.tar"
+      log_info "Saving image archive to ${tar_path}..."
+      docker save "${image_tag}" -o "${tar_path}"
+    fi
 
-  log_pass "Built component image: ${image_tag}"
+    if [[ "${PUSH}" == "true" ]]; then
+      log_info "Pushing image: ${image_tag}..."
+      docker push "${image_tag}"
+    fi
+
+    log_pass "Built component image: ${image_tag}"
+  done
 }
 
 if [[ -n "${TARGET_COMPONENT}" ]]; then

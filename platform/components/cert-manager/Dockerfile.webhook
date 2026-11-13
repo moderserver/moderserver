@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+###############################################
+# ModerServer Cert-Manager Webhook
+# Purpose: Validating and mutating admission webhook for cert-manager resources
+###############################################
+
+# renovate: datasource=docker depName=quay.io/jetstack/cert-manager-webhook
+ARG CERT_MANAGER_VERSION=v1.21.3
+# renovate: datasource=docker depName=alpine
+ARG ALPINE_VERSION=3.24.4
+
+FROM quay.io/jetstack/cert-manager-webhook:${CERT_MANAGER_VERSION} AS webhook-bin
+FROM alpine:${ALPINE_VERSION}
+
+LABEL org.opencontainers.image.title="ModerServer Cert-Manager Webhook" \
+      org.opencontainers.image.description="Admission webhook for ModerServer cert-manager" \
+      org.opencontainers.image.vendor="ModerServer" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=webhook-bin /app/cmd/webhook/webhook /usr/local/bin/cert-manager-webhook
+
+USER 65534:65534
+
+ENTRYPOINT ["/usr/local/bin/cert-manager-webhook"]

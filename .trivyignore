@@ -1,2 +1,4 @@
-# ClusterRole secrets reading required for Gateway API ingress controller
 KSV-0041
+KSV-0114
+CVE-2026-116587
+CVE-2026-78661

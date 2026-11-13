@@ -23,7 +23,7 @@ REGISTRY="${REGISTRY:-ghcr.io/moderserver}"
 
 log_info "[Conformance:Static] Scanning container images for CVE vulnerabilities with trivy (${TRIVY_VERSION})..."
 
-DOCKERFILES=$(find "${TARGET_DIR}" -type f -name "Dockerfile" 2>/dev/null || true)
+DOCKERFILES=$(find "${TARGET_DIR}" -type f -name "Dockerfile*" ! -name "*.dockerignore" 2>/dev/null || true)
 if [[ -z "${DOCKERFILES}" ]]; then
   log_info "No Dockerfiles found in ${TARGET_DIR}, skipping image scan."
   exit 0
@@ -32,6 +32,10 @@ fi
 for df in ${DOCKERFILES}; do
   COMPONENT_DIR=$(dirname "${df}")
   COMPONENT_NAME=$(basename "${COMPONENT_DIR}")
+  df_name=$(basename "${df}")
+  if [[ "${df_name}" == Dockerfile.* ]]; then
+    COMPONENT_NAME="${COMPONENT_NAME}-${df_name#Dockerfile.}"
+  fi
   VERSION="latest"
   if [[ -f "${COMPONENT_DIR}/Chart.yaml" ]]; then
     VERSION=$(awk '/^appVersion:/ {print $2}' "${COMPONENT_DIR}/Chart.yaml" | tr -d '"' | tr '+' '-')
@@ -40,7 +44,7 @@ for df in ${DOCKERFILES}; do
 
   if ! docker image inspect "${IMAGE_TAG}" >/dev/null 2>&1; then
     log_info "Building image locally for vulnerability scanning: ${IMAGE_TAG}..."
-    docker build -t "${IMAGE_TAG}" "${COMPONENT_DIR}" >/dev/null 2>&1 || true
+    docker build -f "${df}" -t "${IMAGE_TAG}" "${COMPONENT_DIR}" >/dev/null 2>&1 || true
   fi
 
   if docker image inspect "${IMAGE_TAG}" >/dev/null 2>&1; then

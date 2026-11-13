@@ -1,0 +1,12 @@
+apiVersion: v2
+name: cert-manager
+description: Cloud-native certificate management and rotation for ModerServer
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=cert-manager/cert-manager
+appVersion: "v1.21.3"
+icon: https://raw.githubusercontent.com/cert-manager/cert-manager/master/logo/logo.png
+dependencies:
+  - name: common
+    version: 0.1.0
+    repository: "file://../../common"

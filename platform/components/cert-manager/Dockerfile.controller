@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+###############################################
+# ModerServer Cert-Manager Controller
+# Purpose: Core certificate controller and rotation reconciler
+###############################################
+
+# renovate: datasource=docker depName=quay.io/jetstack/cert-manager-controller
+ARG CERT_MANAGER_VERSION=v1.21.3
+# renovate: datasource=docker depName=alpine
+ARG ALPINE_VERSION=3.24.4
+
+FROM quay.io/jetstack/cert-manager-controller:${CERT_MANAGER_VERSION} AS controller-bin
+FROM alpine:${ALPINE_VERSION}
+
+LABEL org.opencontainers.image.title="ModerServer Cert-Manager Controller" \
+      org.opencontainers.image.description="Certificate management controller for ModerServer" \
+      org.opencontainers.image.vendor="ModerServer" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=controller-bin /app/cmd/controller/controller /usr/local/bin/cert-manager-controller
+
+USER 65534:65534
+
+ENTRYPOINT ["/usr/local/bin/cert-manager-controller"]

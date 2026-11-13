@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+###############################################
+# ModerServer Cert-Manager CA Injector
+# Purpose: Injects CA bundles into webhooks and CRD conversions
+###############################################
+
+# renovate: datasource=docker depName=quay.io/jetstack/cert-manager-cainjector
+ARG CERT_MANAGER_VERSION=v1.21.3
+# renovate: datasource=docker depName=alpine
+ARG ALPINE_VERSION=3.24.4
+
+FROM quay.io/jetstack/cert-manager-cainjector:${CERT_MANAGER_VERSION} AS cainjector-bin
+FROM alpine:${ALPINE_VERSION}
+
+LABEL org.opencontainers.image.title="ModerServer Cert-Manager CA Injector" \
+      org.opencontainers.image.description="CA bundle injector for ModerServer webhooks" \
+      org.opencontainers.image.vendor="ModerServer" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=cainjector-bin /app/cmd/cainjector/cainjector /usr/local/bin/cert-manager-cainjector
+
+USER 65534:65534
+
+ENTRYPOINT ["/usr/local/bin/cert-manager-cainjector"]

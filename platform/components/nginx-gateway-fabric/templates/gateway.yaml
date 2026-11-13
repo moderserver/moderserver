@@ -14,3 +14,33 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: moderserver-gateway-tls
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: moderserver-gateway-tls
+  namespace: nginx-gateway
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+spec:
+  commonName: "gateway.home.arpa"
+  secretName: moderserver-gateway-tls
+  duration: 2160h
+  renewBefore: 360h
+  issuerRef:
+    name: moderserver-ca
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.home.arpa"
+    - "home.arpa"
+    - "localhost"

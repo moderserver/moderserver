@@ -21,7 +21,7 @@ TARGET_DIR="${1:-.}"
 
 log_info "[Conformance:Static] Checking Dockerfiles with hadolint (${HADOLINT_VERSION})..."
 
-DOCKERFILES=$(find "${TARGET_DIR}" -type f -name "Dockerfile" 2>/dev/null || true)
+DOCKERFILES=$(find "${TARGET_DIR}" -type f -name "Dockerfile*" ! -name "*.dockerignore" 2>/dev/null || true)
 if [[ -z "${DOCKERFILES}" ]]; then
   log_info "No Dockerfile found in ${TARGET_DIR}, skipping."
   exit 0
