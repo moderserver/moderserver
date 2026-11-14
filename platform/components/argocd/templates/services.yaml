@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: https
+      port: 443
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: {{ include "common.names.name" . }}-server
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-repo-server
+  namespace: argocd
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: repo-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: server
+      port: 8081
+      targetPort: server
+    - name: metrics
+      port: 8084
+      targetPort: metrics
+  selector:
+    app.kubernetes.io/name: {{ include "common.names.name" . }}-repo-server
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-redis
+  namespace: argocd
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: tcp-redis
+  selector:
+    app.kubernetes.io/name: {{ include "common.names.name" . }}-redis
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-applicationset-controller
+  namespace: argocd
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: applicationset-controller
+spec:
+  type: ClusterIP
+  ports:
+    - name: webhook
+      port: 7000
+      targetPort: webhook
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+  selector:
+    app.kubernetes.io/name: {{ include "common.names.name" . }}-applicationset
+    app.kubernetes.io/instance: {{ .Release.Name }}

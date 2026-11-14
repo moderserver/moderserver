@@ -19,7 +19,9 @@ set -euo pipefail
 # container mounting the host root filesystem at /host.
 
 HOST_ROOT="${HOST_ROOT:-/host}"
-TARGET_OS_VERSION="${TARGET_OS_VERSION:-3.24.4}"
+# renovate: datasource=docker depName=alpine
+DEFAULT_TARGET_OS_VERSION="3.24.4"
+TARGET_OS_VERSION="${TARGET_OS_VERSION:-${DEFAULT_TARGET_OS_VERSION}}"
 
 echo "==> ModerServer GitOps OS Upgrade Runner"
 echo "--> Target Alpine OS Version: ${TARGET_OS_VERSION}"

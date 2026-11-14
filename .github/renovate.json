@@ -37,7 +37,8 @@
         "^test/e2e/test-workload\\.sh$",
         "^hack/run-qemu\\.sh$",
         "^hack/build-components\\.sh$",
-        "^test/conformance/static/verify-charts-kubeconform\\.sh$"
+        "^test/conformance/static/verify-charts-kubeconform\\.sh$",
+        "^platform/components/upgrade/run-upgrade\\.sh$"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n[A-Z0-9_]+_VERSION=\"(?<currentValue>[^\"]+?)\""
@@ -46,7 +47,7 @@
     {
       "customType": "regex",
       "fileMatch": [
-        "^platform/components/[^/]+/Dockerfile$",
+        "^platform/components/[^/]+/Dockerfile(\\..+)?$",
         "^test/conformance/Dockerfile$"
       ],
       "matchStrings": [
@@ -57,7 +58,8 @@
       "customType": "regex",
       "fileMatch": ["^platform/components/upgrade/templates/os-plan\\.yaml$"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*version:\\s*\"(?<currentValue>[^\"]+?)\""
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*(?:version|value):\\s*\"(?<currentValue>[^\"]+?)\"",
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*image:\\s*\"[^:\"]+:(?<currentValue>[^\"]+?)\""
       ]
     },
     {

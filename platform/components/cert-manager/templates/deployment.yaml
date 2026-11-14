@@ -40,7 +40,7 @@ spec:
                       - linux
       containers:
         - name: cert-manager-controller
-          image: "ghcr.io/moderserver/cert-manager:{{ .Chart.AppVersion }}"
+          image: "ghcr.io/moderserver/cert-manager-controller:{{ .Chart.AppVersion }}"
           imagePullPolicy: IfNotPresent
           args:
             - --v=2

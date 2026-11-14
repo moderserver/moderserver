@@ -1,0 +1,12 @@
+apiVersion: v2
+name: argocd
+description: Declarative GitOps continuous delivery for ModerServer
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=argoproj/argo-cd
+appVersion: "v3.6.1"
+icon: https://raw.githubusercontent.com/argoproj/argo-cd/master/docs/assets/argo.png
+dependencies:
+  - name: common
+    version: 0.1.0
+    repository: "file://../../common"

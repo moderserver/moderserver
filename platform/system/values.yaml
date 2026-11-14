@@ -2,6 +2,9 @@
 global:
   domain: "home.arpa"
 
+argocd:
+  enabled: true
+
 gatewayAPI:
   enabled: true
 

@@ -1,4 +1,7 @@
 dependencies:
+- name: argocd
+  repository: file://../components/argocd
+  version: 0.1.0
 - name: cert-manager
   repository: file://../components/cert-manager
   version: 0.1.0
@@ -14,5 +17,5 @@ dependencies:
 - name: upgrade
   repository: file://../components/upgrade
   version: 0.1.0
-digest: sha256:cca0782acc66938d2b3cb76e728be2a9251fe8b29d5aa5c38989ef30de7df99b
-generated: "2026-11-13T10:48:12.645252687+01:00"
+digest: sha256:5845f92b51b637d8d8d2c95ef50845a74868788d63b41891b72c68ddebdfae39
+generated: "2026-11-13T12:50:46.862452602+01:00"

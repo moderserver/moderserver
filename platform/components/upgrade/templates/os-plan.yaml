@@ -20,7 +20,9 @@ spec:
   # renovate: datasource=docker depName=alpine
   version: "3.24.4"
   upgrade:
+    # renovate: datasource=docker depName=alpine
     image: "ghcr.io/moderserver/os-upgrade:3.24.4"
     envs:
       - name: TARGET_OS_VERSION
+        # renovate: datasource=docker depName=alpine
         value: "3.24.4"

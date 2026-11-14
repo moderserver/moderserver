@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+###############################################
+# ModerServer Argo CD Redis
+# Purpose: Minimal in-memory cache for Argo CD repo-server and API server
+###############################################
+
+# renovate: datasource=docker depName=alpine
+ARG ALPINE_VERSION=3.24.4
+
+FROM alpine:${ALPINE_VERSION}
+
+LABEL org.opencontainers.image.title="ModerServer Argo CD Redis" \
+      org.opencontainers.image.description="In-memory cache for Argo CD services" \
+      org.opencontainers.image.vendor="ModerServer" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache redis tzdata && \
+    mkdir -p /data && \
+    chown -R 65534:65534 /data
+
+USER 65534:65534
+WORKDIR /data
+
+ENTRYPOINT ["redis-server"]

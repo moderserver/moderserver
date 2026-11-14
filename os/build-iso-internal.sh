@@ -68,7 +68,7 @@ ln -s /etc/init.d/local "${WORK_DIR}/ovl/etc/runlevels/default/local"
 # Configure syslinux timeout to 1 and route console to serial
 sed -i "s/timeout .*/timeout 1/" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
 sed -i "s/prompt .*/prompt 0/I" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
-sed -i "s#APPEND .*#APPEND modules=loop,squashfs,sd-mod,usb-storage console=ttyS0,115200 quiet#" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
+sed -i "s#APPEND .*#APPEND modules=loop,squashfs,sd-mod,usb-storage,virtio_blk,virtio_pci,virtio_net,ext4 console=ttyS0,115200 quiet#" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
 echo "SERIAL 0 115200" >> "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg"
 
 echo "--> Generating bootable ModerServer appliance ISO..."

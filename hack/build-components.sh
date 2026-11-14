@@ -111,7 +111,7 @@ if [[ -n "${TARGET_COMPONENT}" ]]; then
 else
   log_info "Building all platform component container images..."
   for comp in "${CORE_ROOT}/platform/components"/*; do
-    if [[ -d "${comp}" && -f "${comp}/Dockerfile" ]]; then
+    if [[ -d "${comp}" ]]; then
       build_component "${comp}"
     fi
   done
