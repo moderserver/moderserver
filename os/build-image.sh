@@ -34,9 +34,51 @@ if [ ! -d "${OUTPUT_DIR}/images" ] || [ -z "$(ls -A "${OUTPUT_DIR}/images" 2>/de
   "${CORE_ROOT}/hack/build-components.sh" --save-dir "${OUTPUT_DIR}/images"
 fi
 
+MANIFESTS_DIR="${OUTPUT_DIR}/manifests"
+rm -rf "${MANIFESTS_DIR}"
+mkdir -p "${MANIFESTS_DIR}"
+
+echo "--> Pre-rendering self-bootstrapping GitOps manifests..."
+cat "${CORE_ROOT}/platform/components/argocd/crds"/*.yaml > "${MANIFESTS_DIR}/00-argocd-crds.yaml"
+
+helm template argocd "${CORE_ROOT}/platform/components/argocd" \
+  --namespace argocd \
+  --include-crds=false > "${MANIFESTS_DIR}/01-argocd.yaml"
+
+cat <<'EOF' > "${MANIFESTS_DIR}/02-root.yaml"
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/moderserver/moderserver.git"
+    targetRevision: "main"
+    path: "platform/system"
+    helm:
+      releaseName: moderserver-platform
+      values: |
+        gitops:
+          localDev: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+EOF
+
 IMAGE_OUT="${OUTPUT_DIR}/moderserver-alpine-${ALPINE_VERSION}.iso"
 
-echo "==> Building ModerServer Alpine Appliance ISO (v${ALPINE_VERSION})..."
+echo "==> Building ModerServer Alpine OS ISO (v${ALPINE_VERSION})..."
 
 docker run --rm --privileged \
   -v "${CORE_ROOT}:${CORE_ROOT}" \
@@ -49,4 +91,4 @@ docker run --rm --privileged \
   "alpine:${ALPINE_VERSION}" \
   "${SCRIPT_DIR}/build-iso-internal.sh"
 
-echo "==> [PASS] Generated bootable appliance ISO at: ${IMAGE_OUT}"
+echo "==> [PASS] Generated bootable OS image ISO at: ${IMAGE_OUT}"

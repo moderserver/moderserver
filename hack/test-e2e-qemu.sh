@@ -32,11 +32,12 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [[ ! -f "${KUBECONFIG:-}" ]]; then
+  STOP_ON_EXIT=true
   log_info "Bootstrapping ModerServer cluster via hack/run-qemu.sh..."
   "${SCRIPT_DIR}/run-qemu.sh" --daemon
+  "${SCRIPT_DIR}/run-qemu.sh" --wait
   KUBECONFIG_PATH=$("${SCRIPT_DIR}/run-qemu.sh" --kubeconfig)
   export KUBECONFIG="${KUBECONFIG_PATH}"
-  STOP_ON_EXIT=true
 fi
 
 log_info "Executing E2E node, security, and workload isolation suite..."

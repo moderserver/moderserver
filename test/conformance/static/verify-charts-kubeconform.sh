@@ -20,11 +20,7 @@ require_tool helm
 
 TARGET_DIR="${1:-.}"
 
-# renovate: datasource=github-releases depName=kubernetes/kubernetes
-DEFAULT_K8S_VERSION="1.37.2"
-K8S_VERSION="${K8S_TARGET_VERSION:-${DEFAULT_K8S_VERSION}}"
-
-log_info "[Conformance:Static] Validating K8s OpenAPI schemas with kubeconform (${KUBECONFORM_VERSION}, K8s ${K8S_VERSION})..."
+log_info "[Conformance:Static] Validating K8s OpenAPI schemas with kubeconform (${KUBECONFORM_VERSION}, K8s ${K8S_TARGET_VERSION})..."
 
 CHARTS=$(find "${TARGET_DIR}" -type f -name "Chart.yaml" -exec dirname {} \; 2>/dev/null || true)
 if [[ -z "${CHARTS}" ]]; then
@@ -47,7 +43,7 @@ for chart in ${CHARTS}; do
   chmod 644 "${MANIFEST}"
 
   run_tool_or_docker kubeconform "${KUBECONFORM_IMAGE}" \
-    -summary -strict -ignore-missing-schemas -kubernetes-version "${K8S_VERSION}" \
+    -summary -strict -ignore-missing-schemas -kubernetes-version "${K8S_TARGET_VERSION}" \
     -schema-location default \
     -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
     "${MANIFEST}"

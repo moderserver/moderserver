@@ -8,7 +8,7 @@ tls-san:
   - "127.0.0.1"
   - "localhost"
 
-# Ditch useless default components (Gateway API replaces Traefik, NodePort/Gateway replaces ServiceLB)
+# Disable default components superseded by platform Gateway API and NodePort routing
 disable:
   - traefik
   - servicelb

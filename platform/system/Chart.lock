@@ -1,21 +1,6 @@
 dependencies:
-- name: argocd
-  repository: file://../components/argocd
+- name: common
+  repository: file://../common
   version: 0.1.0
-- name: cert-manager
-  repository: file://../components/cert-manager
-  version: 0.1.0
-- name: gateway-api
-  repository: file://../components/gateway-api
-  version: 0.1.0
-- name: nginx-gateway-fabric
-  repository: file://../components/nginx-gateway-fabric
-  version: 0.1.0
-- name: system-upgrade-controller
-  repository: file://../components/system-upgrade-controller
-  version: 0.1.0
-- name: upgrade
-  repository: file://../components/upgrade
-  version: 0.1.0
-digest: sha256:5845f92b51b637d8d8d2c95ef50845a74868788d63b41891b72c68ddebdfae39
-generated: "2026-11-13T12:50:46.862452602+01:00"
+digest: sha256:636a65e9846bdff17cc4e65b0849061f783759a37aa51fb85ff6fd8ba5e68467
+generated: "2026-11-14T16:45:56.223661789+01:00"

@@ -33,6 +33,11 @@ kubectl config view --raw > "${TMP_KUBECONFIG}"
 chmod 644 "${TMP_KUBECONFIG}"
 trap 'rm -f "${TMP_KUBECONFIG}"' EXIT
 
+NAMESPACE_ARGS=("--namespace" "${NAMESPACE}")
+if [[ "${NAMESPACE}" == "all" || "${NAMESPACE}" == "--all-namespaces" || -z "${NAMESPACE}" ]]; then
+  NAMESPACE_ARGS=("-A")
+fi
+
 log_info "[Conformance:Runtime] Sanitizing active namespace '${NAMESPACE}' with popeye (${POPEYE_VERSION})..."
 
 docker run --rm \
@@ -41,7 +46,7 @@ docker run --rm \
   -e KUBECONFIG=/tmp/kubeconfig \
   "${POPEYE_IMAGE}" \
   --kubeconfig /tmp/kubeconfig \
-  --namespace "${NAMESPACE}" \
+  "${NAMESPACE_ARGS[@]}" \
   "${EXTRA_ARGS[@]}" \
   --min-score 70 \
   --save=false \

@@ -1,21 +1,62 @@
-# ModerServer System Platform Configuration
+# ModerServer GitOps Platform Root Application (App of Apps)
 global:
   domain: "home.arpa"
 
-argocd:
-  enabled: true
+gitops:
+  # Upstream Git repository (Production default)
+  repoURL: "https://github.com/moderserver/moderserver.git"
+  targetRevision: "main"
 
-gatewayAPI:
-  enabled: true
+  # Local Development Switch (Option C)
+  localDev: false
+  localRepoURL: "git://10.0.2.2:19418/moderserver.git"
 
-certManager:
-  enabled: true
+components:
+  gateway-api:
+    enabled: true
+    name: gateway-api
+    path: platform/components/gateway-api
+    namespace: moderserver-system
+    syncWave: "0"
 
-nginxGatewayFabric:
-  enabled: true
+  cert-manager:
+    enabled: true
+    name: cert-manager
+    path: platform/components/cert-manager
+    namespace: cert-manager
+    syncWave: "1"
 
-systemUpgradeController:
-  enabled: true
+  cluster-issuers:
+    enabled: true
+    name: cluster-issuers
+    path: platform/components/cluster-issuers
+    namespace: cert-manager
+    syncWave: "2"
 
-upgrade:
-  enabled: false
+  nginx-gateway-fabric:
+    enabled: true
+    name: nginx-gateway-fabric
+    path: platform/components/nginx-gateway-fabric
+    namespace: nginx-gateway
+    syncWave: "3"
+
+  system-upgrade-controller:
+    enabled: true
+    name: system-upgrade-controller
+    path: platform/components/system-upgrade-controller
+    namespace: system-upgrade
+    syncWave: "3"
+
+  upgrade:
+    enabled: false
+    name: upgrade
+    path: platform/components/upgrade
+    namespace: system-upgrade
+    syncWave: "5"
+
+  argocd:
+    enabled: true
+    name: argocd
+    path: platform/components/argocd
+    namespace: argocd
+    syncWave: "4"

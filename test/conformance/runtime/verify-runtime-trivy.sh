@@ -27,6 +27,13 @@ kubectl config view --raw > "${TMP_KUBECONFIG}"
 chmod 644 "${TMP_KUBECONFIG}"
 trap 'rm -f "${TMP_KUBECONFIG}"' EXIT
 
+NAMESPACE_ARGS=()
+if [[ -n "${NAMESPACE}" && "${NAMESPACE}" != "all" && "${NAMESPACE}" != "--all-namespaces" ]]; then
+  NAMESPACE_ARGS=("--include-namespaces" "${NAMESPACE}")
+else
+  NAMESPACE_ARGS=("--exclude-namespaces" "kube-system,kube-public,kube-node-lease")
+fi
+
 log_info "[Conformance:Runtime] Auditing live cluster security with trivy k8s (${TRIVY_VERSION}) in namespace '${NAMESPACE}'..."
 
 docker run --rm \
@@ -36,7 +43,7 @@ docker run --rm \
   "${TRIVY_IMAGE}" \
   k8s \
   --kubeconfig /tmp/kubeconfig \
-  --include-namespaces "${NAMESPACE}" \
+  "${NAMESPACE_ARGS[@]}" \
   --report summary \
   --scanners misconfig \
   --severity CRITICAL,HIGH \

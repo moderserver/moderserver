@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 require_tool kubectl
 
-NAMESPACE="${1:-moderserver-system}"
+NAMESPACE="${1:-all}"
 
 CLUSTER_NAME="moderserver-runtime-cluster"
 export CLUSTER_NAME
@@ -35,11 +35,12 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if [[ ! -f "${KUBECONFIG:-}" ]]; then
+  STOP_ON_EXIT=true
   log_info "Bootstrapping ModerServer cluster via hack/run-qemu.sh..."
   "${SCRIPT_DIR}/run-qemu.sh" --daemon
+  "${SCRIPT_DIR}/run-qemu.sh" --wait
   KUBECONFIG_PATH=$("${SCRIPT_DIR}/run-qemu.sh" --kubeconfig)
   export KUBECONFIG="${KUBECONFIG_PATH}"
-  STOP_ON_EXIT=true
 fi
 
 log_info "Executing Runtime Conformance analysis on namespace '${NAMESPACE}'..."

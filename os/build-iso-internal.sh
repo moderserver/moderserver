@@ -60,6 +60,12 @@ if [ -d "${CORE_ROOT}/_output/images" ] && [ "$(ls -A "${CORE_ROOT}/_output/imag
   cp "${CORE_ROOT}/_output/images"/*.tar "${WORK_DIR}/iso-extract/root/bootstrap/images/" 2>/dev/null || true
 fi
 
+mkdir -p "${WORK_DIR}/iso-extract/root/bootstrap/manifests"
+if [ -d "/output/manifests" ] && [ "$(ls -A /output/manifests 2>/dev/null)" ]; then
+  echo "--> Pre-baking platform GitOps bootstrap manifests into ISO..."
+  cp /output/manifests/*.yaml "${WORK_DIR}/iso-extract/root/bootstrap/manifests/" 2>/dev/null || true
+fi
+
 echo "--> Packaging ModerServer automated startup overlay..."
 cp -r "${CORE_ROOT}/os/overlay"/* "${WORK_DIR}/ovl/"
 ln -s /etc/init.d/local "${WORK_DIR}/ovl/etc/runlevels/default/local"
@@ -71,7 +77,7 @@ sed -i "s/prompt .*/prompt 0/I" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.
 sed -i "s#APPEND .*#APPEND modules=loop,squashfs,sd-mod,usb-storage,virtio_blk,virtio_pci,virtio_net,ext4 console=ttyS0,115200 quiet#" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
 echo "SERIAL 0 115200" >> "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg"
 
-echo "--> Generating bootable ModerServer appliance ISO..."
+echo "--> Generating bootable ModerServer OS ISO..."
 xorriso -as mkisofs \
   -r -V "MODERSERVER" \
   -o "${IMAGE_OUT}" \

@@ -118,7 +118,7 @@ jobs:
           ./hack/build-conformance.sh ${PUSH_FLAG}
 
   build:
-    name: Build (Appliance Image)
+    name: Build (OS Image)
     needs: build-components
     runs-on: ubuntu-latest
     steps:
@@ -147,14 +147,24 @@ jobs:
     name: E2E (QEMU VM Test)
     needs: [verify, build]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          # renovate: datasource=github-releases depName=helm/helm
+          version: "v4.3.1"
 
       - name: Install QEMU & Virtualization Tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage p7zip-full
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          fi
 
       - name: Download Installer Artifact
         uses: actions/download-artifact@v8
@@ -170,6 +180,7 @@ jobs:
     name: Conformance (Runtime Analysis)
     needs: [conformance-static, build]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -184,6 +195,9 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage p7zip-full
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+          fi
 
       - name: Download Installer Artifact
         uses: actions/download-artifact@v8

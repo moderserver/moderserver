@@ -1,0 +1,43 @@
+{{- range $key, $config := .Values.components }}
+{{- if $config.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $config.name | default $key }}
+  namespace: argocd
+  labels:
+    {{- include "common.labels.standard" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $config.name | default $key }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $config.syncWave | default "0" | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: {{ if $.Values.gitops.localDev }}{{ $.Values.gitops.localRepoURL }}{{ else }}{{ $.Values.gitops.repoURL }}{{ end }}
+    targetRevision: {{ $.Values.gitops.targetRevision | quote }}
+    path: {{ $config.path }}
+    helm:
+      releaseName: {{ $config.name | default $key }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ $config.namespace }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .spec.conversion
+        - .status
+{{- end }}
+{{- end }}

@@ -14,7 +14,7 @@ help: ## Show this help message
 verify-all: ## Run all static verifications (boilerplate, shellcheck, actionlint, yamllint, renovate, gitleaks)
 	./hack/verify-all.sh
 
-build-all: build-components build-image build-conformance ## Build all platform components, appliance ISO, and conformance container
+build-all: build-components build-image build-conformance ## Build all platform components, OS image ISO, and conformance container
 
 build-components: ## Build platform component container images (or COMPONENT=<name>)
 	./hack/build-components.sh $(COMPONENT)

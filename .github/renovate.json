@@ -37,7 +37,6 @@
         "^test/e2e/test-workload\\.sh$",
         "^hack/run-qemu\\.sh$",
         "^hack/build-components\\.sh$",
-        "^test/conformance/static/verify-charts-kubeconform\\.sh$",
         "^platform/components/upgrade/run-upgrade\\.sh$"
       ],
       "matchStrings": [

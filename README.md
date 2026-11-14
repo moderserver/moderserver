@@ -8,7 +8,7 @@ The foundational Alpine Linux and lightweight Kubernetes (K3s) distribution for 
 ## Architecture & Responsibilities
 
 1. **Lightweight Alpine Linux OS (<100MB RAM Idle)**:
-   * Built on **Alpine Linux** with **OpenRC** (no systemd bloat, no snapd, no background telemetry).
+   * Built on **Alpine Linux** with **OpenRC** (lightweight initialization without systemd, snapd, or background telemetry).
    * Fully automated, unattended flash drive installer (`os/answers.conf`).
    * Declarative, tested OS upgrades: the host OS version and K3s runtime are pinned in Git and upgraded only via verified GitOps releases.
 
@@ -26,10 +26,10 @@ From the `moderserver/` directory:
 # Run all repository static verifications (license headers, shellcheck, actionlint, yamllint, renovate, gitleaks)
 make verify-all
 
-# Build all platform components, appliance ISO, and conformance tools
+# Build all platform components, OS image ISO, and conformance tools
 make build-all
 
-# Run interactive QEMU appliance virtual machine (Ctrl+C to stop)
+# Run interactive QEMU virtual machine (Ctrl+C to stop)
 make run-qemu
 
 # Run Static Conformance against platform components

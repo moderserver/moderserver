@@ -23,7 +23,7 @@ if [ -f /tmp/moderserver-boot.done ]; then
 fi
 touch /tmp/moderserver-boot.done
 
-# 1. Set valid appliance hostname
+# 1. Set valid system hostname
 hostname moderserver
 echo "moderserver" > /etc/hostname
 
@@ -88,6 +88,23 @@ if [ -d /media/cdrom/root/bootstrap/images ]; then
   echo "--> Staging pre-baked platform container images..." > /dev/ttyS0
   mkdir -p /var/lib/rancher/k3s/agent/images
   cp -f /media/cdrom/root/bootstrap/images/*.tar /var/lib/rancher/k3s/agent/images/ 2>/dev/null || true
+fi
+
+# Pre-load platform GitOps bootstrap manifests into K3s server auto-deploy
+if [ -d /media/cdrom/root/bootstrap/manifests ]; then
+  echo "--> Staging platform GitOps bootstrap manifests..." > /dev/ttyS0
+  mkdir -p /var/lib/rancher/k3s/server/manifests
+  cp -f /media/cdrom/root/bootstrap/manifests/*.yaml /var/lib/rancher/k3s/server/manifests/ 2>/dev/null || true
+
+  # Check if hypervisor passed a dev GitOps mirror URL via SMBIOS serial (e.g. QEMU local dev)
+  if [ -f /sys/class/dmi/id/product_serial ]; then
+    DMI_SERIAL=$(cat /sys/class/dmi/id/product_serial 2>/dev/null || true)
+    if echo "${DMI_SERIAL}" | grep -q "^git://"; then
+      echo "--> Applying local dev GitOps mirror from hypervisor: ${DMI_SERIAL}" > /dev/ttyS0
+      sed -i -E "s#repoURL: .*#repoURL: \"${DMI_SERIAL}\"#" /var/lib/rancher/k3s/server/manifests/02-root.yaml || true
+      sed -i -E "s#localDev: false#localDev: true#" /var/lib/rancher/k3s/server/manifests/02-root.yaml || true
+    fi
+  fi
 fi
 
 # 5. Run ModerServer host bootstrap
