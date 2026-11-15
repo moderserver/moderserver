@@ -33,7 +33,7 @@ metadata:
   labels:
     {{- include "common.labels.standard" . | nindent 4 }}
 spec:
-  commonName: "gateway.home.arpa"
+  commonName: {{ printf "gateway.%s" (include "nginx-gateway-fabric.domain" .) | quote }}
   secretName: moderserver-gateway-tls
   duration: 2160h
   renewBefore: 360h
@@ -41,6 +41,27 @@ spec:
     name: moderserver-ca
     kind: ClusterIssuer
   dnsNames:
-    - "*.home.arpa"
-    - "home.arpa"
-    - "localhost"
+    {{- $domain := include "nginx-gateway-fabric.domain" . }}
+    {{- range (list (printf "*.%s" $domain) $domain "localhost" | uniq) }}
+    - {{ . | quote }}
+    {{- end }}
+---
+# Plain HTTP is never served: every request on the HTTP listener is redirected
+# to HTTPS. Application routes attach to the https listener only.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: https-redirect
+  namespace: nginx-gateway
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: moderserver-gateway
+      sectionName: http
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

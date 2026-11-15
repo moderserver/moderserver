@@ -1,0 +1,12 @@
+# Runtime trivy findings accepted in the nginx-gateway namespace only.
+
+# KSV-0024: container sets host ports.
+# The NGINX data plane publishes the platform Gateway on the node's ports 80
+# and 443: a home server has no external load balancer in front of it. This is
+# the only workload allowed to bind host ports.
+KSV-0024
+
+# KSV-0056: role can manage Services.
+# The gateway controller creates the Service of the data plane it provisions;
+# the Role is namespaced and limited to nginx-gateway.
+KSV-0056

@@ -25,7 +25,7 @@ while IFS= read -r file; do
     log_error "Missing copyright header in: ${file}"
     MISSING=$((MISSING + 1))
   fi
-done < <(find "${CORE_ROOT}/hack" "${CORE_ROOT}/bootstrap" "${CORE_ROOT}/os" "${CORE_ROOT}/platform" "${CORE_ROOT}/test" -type f -name "*.sh" -o -name "k3s-service")
+done < <(find "${CORE_ROOT}/hack" "${CORE_ROOT}/bootstrap" "${CORE_ROOT}/os" "${CORE_ROOT}/platform" "${CORE_ROOT}/test" -type f \( -name "*.sh" -o -name "*.start" -o -name "*-service" \))
 
 if [[ "${MISSING}" -gt 0 ]]; then
   log_error "Found ${MISSING} file(s) missing the copyright boilerplate header."

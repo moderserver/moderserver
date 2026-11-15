@@ -18,29 +18,32 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 
-CLUSTER_NAME="moderserver-e2e-cluster"
-export CLUSTER_NAME
 
-STOP_ON_EXIT=false
+use_test_cluster
 
-cleanup() {
-  if [[ "${STOP_ON_EXIT}" == "true" ]]; then
-    log_info "Stopping E2E test cluster..."
-    "${SCRIPT_DIR}/run-qemu.sh" --stop >/dev/null 2>&1 || true
-  fi
-}
-trap cleanup EXIT INT TERM
+# The gateway publishes the node's ports 80/443, forwarded by QEMU to these host ports
+export GATEWAY_ADDRESS="127.0.0.1"
+export GATEWAY_HTTP_PORT="${PORT_HTTP:-18080}"
+export GATEWAY_HTTPS_PORT="${PORT_HTTPS:-18443}"
 
-if [[ ! -f "${KUBECONFIG:-}" ]]; then
-  STOP_ON_EXIT=true
-  log_info "Bootstrapping ModerServer cluster via hack/run-qemu.sh..."
-  "${SCRIPT_DIR}/run-qemu.sh" --daemon
-  "${SCRIPT_DIR}/run-qemu.sh" --wait
-  KUBECONFIG_PATH=$("${SCRIPT_DIR}/run-qemu.sh" --kubeconfig)
-  export KUBECONFIG="${KUBECONFIG_PATH}"
-fi
-
-log_info "Executing E2E node, security, and workload isolation suite..."
+log_info "Executing E2E node, security, workload isolation and gateway suite..."
 "${CORE_ROOT}/test/e2e/run.sh" --kubeconfig "${KUBECONFIG}"
+
+if [[ "${TEST_CLUSTER_STARTED}" == "true" ]]; then
+  log_info "=========================================================="
+  log_info "  Stage 5: Persistence Across Reboot"
+  log_info "=========================================================="
+  NODE_UID_BEFORE=$(kubectl get node -o jsonpath='{.items[0].metadata.uid}')
+  "${SCRIPT_DIR}/run-qemu.sh" --reboot
+  "${SCRIPT_DIR}/run-qemu.sh" --wait
+  NODE_UID_AFTER=$(kubectl get node -o jsonpath='{.items[0].metadata.uid}')
+  if [[ "${NODE_UID_BEFORE}" != "${NODE_UID_AFTER}" ]]; then
+    log_error "The node did not rejoin its own cluster after reboot (cluster state was lost)."
+    exit 1
+  fi
+  "${CORE_ROOT}/test/e2e/test-node.sh"
+  "${CORE_ROOT}/test/e2e/test-gateway.sh"
+  log_pass "Node, cluster state and platform survived a reboot."
+fi
 
 log_pass "E2E infrastructure assertions executed successfully."

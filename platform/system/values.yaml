@@ -1,15 +1,17 @@
 # ModerServer GitOps Platform Root Application (App of Apps)
+#
+# These values are set per node by the root Application, which the host
+# bootstrap generates from /etc/moderserver/moderserver.conf at first boot.
 global:
+  # Base domain of the server; every component host is <name>.<domain>
   domain: "home.arpa"
 
 gitops:
-  # Upstream Git repository (Production default)
+  # Git repository and revision every platform component is reconciled from.
+  # `stable` only ever points at commits that passed the full CI pipeline
+  # (static conformance, QEMU E2E and runtime conformance).
   repoURL: "https://github.com/moderserver/moderserver.git"
-  targetRevision: "main"
-
-  # Local Development Switch (Option C)
-  localDev: false
-  localRepoURL: "git://10.0.2.2:19418/moderserver.git"
+  targetRevision: "stable"
 
 components:
   gateway-api:
@@ -47,6 +49,8 @@ components:
     namespace: system-upgrade
     syncWave: "3"
 
+  # Opt-in: once enabled, the node upgrades its K3s binary and Alpine packages
+  # to the versions pinned in Git, and reboots itself after a kernel upgrade.
   upgrade:
     enabled: false
     name: upgrade
@@ -60,3 +64,12 @@ components:
     path: platform/components/argocd
     namespace: argocd
     syncWave: "4"
+    # argocd-server generates server.secretkey and the admin password into this
+    # Secret at first start; Git only declares that the Secret exists.
+    ignoreDifferences:
+      - group: ""
+        kind: Secret
+        name: argocd-secret
+        namespace: argocd
+        jsonPointers:
+          - /data

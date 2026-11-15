@@ -22,34 +22,13 @@ spec:
     spec:
       serviceAccountName: system-upgrade
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        runAsGroup: 65534
-        fsGroup: 65534
-        seccompProfile:
-          type: RuntimeDefault
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
-                  - key: kubernetes.io/os
-                    operator: In
-                    values:
-                      - linux
+        {{- include "common.security.pod" (dict) | nindent 8 }}
       containers:
         - name: system-upgrade-controller
-          image: "ghcr.io/moderserver/system-upgrade-controller:{{ .Chart.AppVersion }}"
+          image: {{ include "common.images.ref" (dict "ctx" . "name" "system-upgrade-controller") | quote }}
           imagePullPolicy: IfNotPresent
           securityContext:
-            {{- include "common.security.container" . | nindent 12 }}
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            seccompProfile:
-              type: RuntimeDefault
+            {{- include "common.security.container" (dict) | nindent 12 }}
           env:
             - name: SYSTEM_UPGRADE_CONTROLLER_NAME
               valueFrom:
@@ -85,17 +64,7 @@ spec:
             - name: etc-ca-certificates
               mountPath: /etc/ca-certificates
               readOnly: true
-      nodeSelector:
-        node-role.kubernetes.io/control-plane: "true"
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-          effect: NoSchedule
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+      {{- include "common.scheduling.controlPlane" . | nindent 6 }}
       volumes:
         - name: tmp
           emptyDir: {}

@@ -1,6 +1,39 @@
+# Trivy findings accepted for the ModerServer platform.
+# Every entry needs a reason; CVE entries also need an expiry date so they are
+# re-evaluated instead of being ignored forever.
+
+# --- Kubernetes RBAC checks (static chart scans) ---------------------------
+# These fire on controllers whose job requires the flagged permission.
+
+# KSV-0041: role can manage Secrets.
+# cert-manager stores issued certificates and keys in Secrets; Argo CD and the
+# gateway controller read and write the Secrets of the resources they manage.
 KSV-0041
+
+# KSV-0044: role with wildcard verbs on wildcard resources.
+# The Argo CD application controller applies arbitrary manifests from Git and
+# is cluster-admin by design.
 KSV-0044
+
+# KSV-0046: role can manage all resources.
+# Same Argo CD application controller ClusterRole as KSV-0044.
 KSV-0046
+
+# KSV-0114: role can manage admission webhook configurations.
+# The cert-manager CA injector writes the CA bundle into webhook configurations.
 KSV-0114
-CVE-2026-116587
-CVE-2026-78661
+
+# KSV-0056: role can manage Services.
+# The gateway controller creates the Service of the NGINX data plane it
+# provisions. The permission is a namespaced Role limited to nginx-gateway.
+KSV-0056
+
+# --- Vulnerabilities in upstream binaries -----------------------------------
+# ModerServer repackages the upstream cert-manager v1.21.3 binaries; these are
+# fixed by a cert-manager release that bumps the dependency, not by this repo.
+
+# golang.org/x/net v0.60.0 (fixed in v0.62.0) in the cert-manager binaries
+CVE-2026-78661 exp:2027-02-15
+
+# github.com/go-jose/go-jose/v4 v4.1.4 (fixed in v4.1.6) in cert-manager-controller
+CVE-2026-116587 exp:2027-02-15

@@ -24,26 +24,29 @@ spec:
     spec:
       serviceAccountName: argocd-redis
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        runAsGroup: 65534
-        fsGroup: 65534
-        seccompProfile:
-          type: RuntimeDefault
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
-                  - key: kubernetes.io/os
-                    operator: In
-                    values:
-                      - linux
+        {{- include "common.security.pod" (dict) | nindent 8 }}
+      initContainers:
+        # Generates the argocd-redis Secret with a random password on first start.
+        # The Secret is never stored in Git, so every install has its own credential.
+        - name: secret-init
+          image: {{ include "common.images.ref" (dict "ctx" . "name" "argocd") | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /usr/local/bin/argocd
+            - admin
+            - redis-initial-password
+          securityContext:
+            {{- include "common.security.container" (dict) | nindent 12 }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
       containers:
         - name: redis
-          image: "ghcr.io/moderserver/argocd-redis:{{ .Chart.AppVersion }}"
+          image: {{ include "common.images.ref" (dict "ctx" . "name" "argocd-redis") | quote }}
           imagePullPolicy: IfNotPresent
           args:
             - --save
@@ -72,12 +75,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 15
           securityContext:
-            {{- include "common.security.container" . | nindent 12 }}
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            seccompProfile:
-              type: RuntimeDefault
+            {{- include "common.security.container" (dict) | nindent 12 }}
           resources:
             requests:
               cpu: 25m
@@ -91,14 +89,4 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
-      nodeSelector:
-        node-role.kubernetes.io/control-plane: "true"
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-          effect: NoSchedule
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+      {{- include "common.scheduling.controlPlane" . | nindent 6 }}

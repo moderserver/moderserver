@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+###############################################
+# ModerServer NGINX Gateway Fabric Data Plane
+# Purpose: NGINX and NGINX Agent pods provisioned by the control plane for each Gateway
+###############################################
+
+# renovate: datasource=docker depName=ghcr.io/nginx/nginx-gateway-fabric/nginx
+ARG NGF_NGINX_VERSION=2.8.1
+
+FROM ghcr.io/nginx/nginx-gateway-fabric/nginx:${NGF_NGINX_VERSION}
+
+LABEL org.opencontainers.image.title="ModerServer NGINX Gateway Fabric Data Plane" \
+      org.opencontainers.image.description="NGINX data plane for the ModerServer Gateway" \
+      org.opencontainers.image.vendor="ModerServer" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# Pick up Alpine security fixes released after the upstream image was built
+USER root
+# hadolint ignore=DL3017
+RUN apk upgrade --no-cache
+
+USER 101:1001

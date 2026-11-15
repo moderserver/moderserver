@@ -22,6 +22,8 @@ ARG GITLEAKS_VERSION=v8.30.1
 ARG SHELLCHECK_VERSION=v0.11.0
 # renovate: datasource=docker depName=derailed/popeye
 ARG POPEYE_VERSION=v0.22.1
+# renovate: datasource=docker depName=quay.io/kubescape/kubescape-cli
+ARG KUBESCAPE_VERSION=v4.0.20
 
 FROM aquasec/trivy:${TRIVY_VERSION} AS trivy-bin
 FROM hadolint/hadolint:${HADOLINT_VERSION} AS hadolint-bin
@@ -31,6 +33,7 @@ FROM us-docker.pkg.dev/fairwinds-ops/oss/polaris:${POLARIS_VERSION} AS polaris-b
 FROM ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION} AS gitleaks-bin
 FROM koalaman/shellcheck:${SHELLCHECK_VERSION} AS shellcheck-bin
 FROM derailed/popeye:${POPEYE_VERSION} AS popeye-bin
+FROM quay.io/kubescape/kubescape-cli:${KUBESCAPE_VERSION} AS kubescape-bin
 
 FROM alpine:${ALPINE_VERSION}
 
@@ -64,13 +67,7 @@ COPY --from=polaris-bin /usr/local/bin/polaris /usr/local/bin/polaris
 COPY --from=gitleaks-bin /usr/bin/gitleaks /usr/local/bin/gitleaks
 COPY --from=shellcheck-bin /bin/shellcheck /usr/local/bin/shellcheck
 COPY --from=popeye-bin /bin/popeye /usr/local/bin/popeye
-
-# Download Kubescape CLI
-# renovate: datasource=github-releases depName=kubescape/kubescape
-ARG KUBESCAPE_VERSION=v4.0.20
-RUN curl -sfL "https://github.com/kubescape/kubescape/releases/download/${KUBESCAPE_VERSION}/kubescape_${KUBESCAPE_VERSION#v}_linux_amd64" \
-      -o /usr/local/bin/kubescape && \
-    chmod 755 /usr/local/bin/kubescape
+COPY --from=kubescape-bin /usr/bin/kubescape /usr/local/bin/kubescape
 
 # Copy conformance scripts and shared hack libraries
 COPY test/conformance /conformance

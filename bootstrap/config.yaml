@@ -8,7 +8,8 @@ tls-san:
   - "127.0.0.1"
   - "localhost"
 
-# Disable default components superseded by platform Gateway API and NodePort routing
+# Disable default components superseded by the platform Gateway API stack
+# (NGINX Gateway Fabric publishes the Gateway on host ports 80/443)
 disable:
   - traefik
   - servicelb
@@ -33,6 +34,7 @@ kube-apiserver-arg:
   - "service-account-lookup=true"
   - "tls-min-version=VersionTLS12"
   - "enable-admission-plugins=NodeRestriction,PodSecurity"
+  - "admission-control-config-file=/etc/rancher/k3s/pod-security.yaml"
 
 # Networking ranges
 cluster-cidr: "10.42.0.0/16"

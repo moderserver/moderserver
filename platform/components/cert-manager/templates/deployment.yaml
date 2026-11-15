@@ -21,39 +21,30 @@ spec:
     spec:
       serviceAccountName: cert-manager
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        runAsGroup: 65534
-        fsGroup: 65534
-        seccompProfile:
-          type: RuntimeDefault
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
-                  - key: kubernetes.io/os
-                    operator: In
-                    values:
-                      - linux
+        {{- include "common.security.pod" (dict) | nindent 8 }}
       containers:
         - name: cert-manager-controller
-          image: "ghcr.io/moderserver/cert-manager-controller:{{ .Chart.AppVersion }}"
+          image: {{ include "common.images.ref" (dict "ctx" . "name" "cert-manager-controller") | quote }}
           imagePullPolicy: IfNotPresent
           args:
             - --v=2
             - --cluster-resource-namespace=cert-manager
             - --leader-election-namespace=cert-manager
             - --enable-gateway-api
+          ports:
+            - name: http-healthz
+              containerPort: 9403
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http-healthz
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 8
           securityContext:
-            {{- include "common.security.container" . | nindent 12 }}
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            seccompProfile:
-              type: RuntimeDefault
+            {{- include "common.security.container" (dict) | nindent 12 }}
           resources:
             requests:
               cpu: 50m
@@ -61,14 +52,4 @@ spec:
             limits:
               cpu: 200m
               memory: 256Mi
-      nodeSelector:
-        node-role.kubernetes.io/control-plane: "true"
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-          effect: NoSchedule
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+      {{- include "common.scheduling.controlPlane" . | nindent 6 }}

@@ -7,7 +7,7 @@ metadata:
     {{- include "argocd.labels.standard" . | nindent 4 }}
     app.kubernetes.io/component: server
 data:
-  url: "https://argocd.home.arpa"
+  url: "https://{{ include "common.names.host" . }}"
   resource.customizations.health.apiextensions.k8s.io_CustomResourceDefinition: |
     hs = {}
     hs.status = "Healthy"
@@ -84,7 +84,9 @@ metadata:
     {{- include "argocd.labels.standard" . | nindent 4 }}
     app.kubernetes.io/component: server
 data:
-  policy.default: "role:admin"
+  # No default role: an authenticated account only gets what a policy grants it.
+  # The built-in admin account keeps full access.
+  policy.default: ""
 ---
 apiVersion: v1
 kind: ConfigMap

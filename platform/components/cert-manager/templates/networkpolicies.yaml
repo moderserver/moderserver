@@ -1,0 +1,22 @@
+{{ include "common.networkpolicy.defaultDeny" (dict "ctx" . "namespace" "cert-manager") }}
+---
+# The admission webhook is called by the API server, which is not a pod:
+# allow the webhook port from any source and nothing else in the namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-webhook
+  namespace: cert-manager
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: webhook
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 10250

@@ -1,0 +1,27 @@
+# Cluster-wide Pod Security Admission defaults
+# Placed at /etc/rancher/k3s/pod-security.yaml
+#
+# A namespace without pod-security.kubernetes.io labels is not unrestricted:
+# it enforces the baseline profile (no privileged containers, no host
+# namespaces, no host ports, no hostPath volumes) and audits against restricted.
+# Namespaces that need more (or less) must say so explicitly with labels.
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+plugins:
+  - name: PodSecurity
+    configuration:
+      apiVersion: pod-security.admission.config.k8s.io/v1
+      kind: PodSecurityConfiguration
+      defaults:
+        enforce: "baseline"
+        enforce-version: "latest"
+        audit: "restricted"
+        audit-version: "latest"
+        warn: "restricted"
+        warn-version: "latest"
+      exemptions:
+        usernames: []
+        runtimeClasses: []
+        # K3s' own system components (CoreDNS, local-path provisioner helpers)
+        namespaces:
+          - kube-system

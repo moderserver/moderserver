@@ -11,8 +11,9 @@ spec:
   parentRefs:
     - name: moderserver-gateway
       namespace: nginx-gateway
+      sectionName: https
   hostnames:
-    - "argocd.home.arpa"
+    - {{ include "common.names.host" . | quote }}
   rules:
     - matches:
         - path:

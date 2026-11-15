@@ -30,11 +30,8 @@ fi
 
 for chart in ${CHARTS}; do
   log_info "Linting Helm chart: ${chart}"
-  (
-    cd "${chart}"
-    helm dependency update >/dev/null 2>&1 || true
-    helm lint .
-  )
+  build_chart_dependencies "${chart}"
+  helm lint "${chart}"
 done
 
 log_pass "Helm chart linting verified."

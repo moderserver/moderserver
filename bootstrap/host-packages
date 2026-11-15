@@ -1,0 +1,35 @@
+# Host packages installed on every ModerServer node, one per line.
+#
+# Single source of truth: os/build-iso-internal.sh bundles these (and their
+# dependencies) into the installer ISO, bootstrap/setup-host.sh installs them.
+# Keep this list short: every package here costs disk and attack surface on
+# every node.
+
+# TLS trust store and HTTP client (K3s binary download in standalone setups)
+ca-certificates
+curl
+
+# Packet filtering used by kube-proxy, Flannel and the NetworkPolicy controller
+iptables
+ip6tables
+ebtables
+
+# cgroup inspection tooling
+cgroup-tools
+
+# Remote access tunnels
+wireguard-tools
+
+# Time synchronisation (TLS and certificate validity depend on it)
+chrony
+
+# Graceful shutdown on power button
+acpid
+
+# Compressed in-RAM swap
+zram-init
+
+# Firmware for the hardware ModerServer targets (Intel N100/N150 mini PCs):
+# Intel graphics (QuickSync transcoding) and Realtek 1G/2.5G network cards
+linux-firmware-i915
+linux-firmware-rtl_nic

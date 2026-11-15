@@ -1,2 +1,0 @@
-# Default values for argocd.
-# GitOps controller, API server, repo-server, and ApplicationSets are managed deterministically by the platform.

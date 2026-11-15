@@ -35,4 +35,7 @@ log_info "==> Step 5: Checking Renovate configuration..."
 log_info "==> Step 6: Checking for secret leaks with Gitleaks..."
 "${HACK_DIR}/verify-gitleaks.sh"
 
+log_info "==> Step 7: Checking chart image references against built image tags..."
+"${HACK_DIR}/verify-image-tags.sh"
+
 log_pass "All core static verifications passed successfully."

@@ -9,9 +9,9 @@ on:
       - main
   workflow_dispatch:
 
+# Least privilege by default; the jobs that publish request more explicitly.
 permissions:
   contents: read
-  packages: write
 
 jobs:
   verify:
@@ -20,6 +20,12 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          # renovate: datasource=github-releases depName=helm/helm
+          version: "v4.3.1"
 
       - name: Run Static Verifications
         run: |
@@ -70,21 +76,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
+      # Images are only built and archived here. They are published by the
+      # promote job, once the exact same archives passed every test.
       - name: Build Platform Component Images
         run: |
-          PUSH_FLAG=""
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            PUSH_FLAG="--push"
-          fi
-          ./hack/build-components.sh --save-dir _output/images ${PUSH_FLAG}
+          ./hack/build-components.sh --save-dir _output/images
 
       - name: Upload Platform Images Artifact
         uses: actions/upload-artifact@v7
@@ -92,11 +88,14 @@ jobs:
           name: moderserver-platform-images
           path: _output/images/*.tar
           retention-days: 1
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   build-conformance:
     name: Build (Conformance Image)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -125,13 +124,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          # renovate: datasource=github-releases depName=helm/helm
+          version: "v4.3.1"
+
       - name: Download Platform Images
         uses: actions/download-artifact@v8
         with:
           name: moderserver-platform-images
           path: _output/images
 
-      - name: Build Bootable Alpine Image
+      - name: Build Bootable Installer Image
         run: |
           make build-image
 
@@ -141,13 +146,13 @@ jobs:
           name: moderserver-installer-iso
           path: _output/*.iso
           retention-days: 1
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   e2e:
     name: E2E (QEMU VM Test)
     needs: [verify, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -180,7 +185,7 @@ jobs:
     name: Conformance (Runtime Analysis)
     needs: [conformance-static, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -208,3 +213,50 @@ jobs:
       - name: Run Runtime Conformance Analysis
         run: |
           make test-conformance-runtime
+
+  # Releases a verified commit: publishes the tested images, then moves the
+  # `stable` branch that every ModerServer node follows. Nothing reaches a node
+  # unless static verification, static conformance, the QEMU E2E suite and
+  # runtime conformance all passed on this exact commit.
+  promote:
+    name: Promote (Publish Images & Advance stable)
+    needs: [verify, conformance-static, e2e, conformance-runtime]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: promote-stable
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download Platform Images
+        uses: actions/download-artifact@v8
+        with:
+          name: moderserver-platform-images
+          path: _output/images
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Tested Platform Images
+        run: |
+          ./hack/push-components.sh _output/images
+
+      - name: Advance stable Branch
+        run: |
+          git fetch origin '+refs/heads/stable:refs/remotes/origin/stable' || true
+          if git rev-parse --verify --quiet origin/stable >/dev/null && ! git merge-base --is-ancestor origin/stable "${GITHUB_SHA}"; then
+            echo "::notice::stable is not an ancestor of ${GITHUB_SHA} (a newer commit was already promoted); leaving it untouched."
+            exit 0
+          fi
+          git push origin "${GITHUB_SHA}:refs/heads/stable"

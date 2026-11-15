@@ -6,20 +6,14 @@ metadata:
   labels:
     {{- include "common.labels.standard" . | nindent 4 }}
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - services
-    verbs:
-      - get
-      - list
-      - watch
+  # Data plane resources provisioned for the Gateway of this namespace
   - apiGroups:
       - ""
     resources:
       - secrets
       - configmaps
       - serviceaccounts
+      - services
       - pods
     verbs:
       - get
@@ -34,13 +28,6 @@ rules:
     resources:
       - services/status
     verbs:
-      - patch
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
       - patch
   - apiGroups:
       - apps
@@ -115,6 +102,22 @@ metadata:
   labels:
     {{- include "common.labels.standard" . | nindent 4 }}
 rules:
+  # NGINX data plane agents authenticate to the control plane with their
+  # ServiceAccount token, which the control plane validates
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
   - apiGroups:
       - ""
     resources:
@@ -178,6 +181,7 @@ rules:
       - gatewayclasses/status
       - gateways
       - gateways/status
+      - gateways/finalizers
       - httproutes
       - httproutes/status
       - grpcroutes

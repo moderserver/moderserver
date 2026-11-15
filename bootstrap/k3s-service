@@ -33,7 +33,7 @@ start_pre() {
 
     # Ensure required cgroup hierarchies are mounted
     if [ ! -d /sys/fs/cgroup ]; then
-        eerror "cgroups hierarchy /sys/fs/cgroup not found. Ensure cgroup_enable=cpuset cgroup_memory=1 is set in bootloader."
+        eerror "cgroups hierarchy /sys/fs/cgroup not found. Ensure the cgroups service is enabled."
         return 1
     fi
 

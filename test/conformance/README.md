@@ -30,6 +30,13 @@ Evaluates workloads running on an active Kubernetes cluster using industry-stand
 | **Popeye** | `runtime/verify-runtime-popeye.sh` | Live cluster sanitization, misallocation, and resource health scoring |
 | **Trivy K8s** | `runtime/verify-runtime-trivy.sh` | Live cluster vulnerability, RBAC, and workload misconfiguration audit |
 
+### Accepted Findings
+
+A finding is never silenced without a written reason:
+
+* `.trivyignore` (repository root) lists the accepted static findings. Each entry is commented, and CVE entries carry an expiry date.
+* `runtime/exceptions/<namespace>.trivyignore` lists accepted runtime findings for one namespace only. Every other namespace is scanned with no exception.
+
 ## Usage
 
 ### Local Execution

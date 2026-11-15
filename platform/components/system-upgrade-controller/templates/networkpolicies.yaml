@@ -1,0 +1,1 @@
+{{ include "common.networkpolicy.defaultDeny" (dict "ctx" . "namespace" "system-upgrade") }}

@@ -19,13 +19,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 require_tool docker
 
-REGISTRY="${REGISTRY:-ghcr.io/moderserver}"
 PUSH="${PUSH:-false}"
 SAVE_DIR="${SAVE_DIR:-}"
 TARGET_COMPONENT=""
-
-# renovate: datasource=docker depName=alpine
-ALPINE_VERSION="3.24.4"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -69,10 +65,8 @@ build_component() {
     return 0
   fi
 
-  local version="latest"
-  if [[ -f "${comp_dir}/Chart.yaml" ]]; then
-    version=$(awk '/^appVersion:/ {print $2}' "${comp_dir}/Chart.yaml" | tr -d '"' | tr '+' '-')
-  fi
+  local version
+  version=$(component_image_tag "${comp_dir}")
 
   for df in "${dockerfiles[@]}"; do
     local suffix
@@ -118,8 +112,8 @@ else
 
   if [[ -n "${SAVE_DIR}" ]]; then
     log_info "Caching base workload image (alpine:${ALPINE_VERSION}) for offline E2E..."
-    docker pull "alpine:${ALPINE_VERSION}" >/dev/null 2>&1 || true
-    docker save "alpine:${ALPINE_VERSION}" -o "${SAVE_DIR}/alpine.tar" >/dev/null 2>&1 || true
+    docker pull "alpine:${ALPINE_VERSION}" >/dev/null
+    docker save "alpine:${ALPINE_VERSION}" -o "${SAVE_DIR}/alpine.tar"
   fi
 fi
 

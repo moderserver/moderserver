@@ -1,0 +1,249 @@
+#!/bin/sh
+# Copyright 2026 ModerServer Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ModerServer unattended installer.
+#
+# Runs once in the live environment booted from the installation media and
+# installs ModerServer on the machine's internal disk, entirely offline:
+#
+#   1. picks the target disk (never the installation media, never removable)
+#   2. installs Alpine Linux in "sys" mode (bootloader, kernel, root filesystem)
+#   3. configures the host and stages K3s, the platform images and the GitOps
+#      bootstrap manifests (bootstrap/setup-host.sh)
+#   4. powers off, so the media can be removed before the first real boot
+#
+# A blank single disk is installed without any question. Anything else (several
+# disks, existing data, an existing ModerServer) requires an explicit answer on
+# the console before a disk is erased.
+
+set -eu
+
+INSTALL_LOG="/tmp/moderserver-install.log"
+TARGET="/mnt"
+ROOT_LABEL="moderserver-root"
+
+# Progress goes to the screen and, when present, the first serial port
+say() {
+  { echo "$*" > /dev/tty0; } 2>/dev/null || true
+  { echo "$*" > /dev/ttyS0; } 2>/dev/null || true
+}
+
+ask() {
+  say "$1"
+  read -r REPLY < /dev/tty0 || REPLY=""
+}
+
+on_exit() {
+  rc=$?
+  if [ "${rc}" -ne 0 ]; then
+    say ""
+    say "ModerServer installation FAILED. Last log lines (${INSTALL_LOG}):"
+    tail -n 25 "${INSTALL_LOG}" 2>/dev/null | while IFS= read -r line; do say "  ${line}"; done
+    say "===MODERSERVER_INSTALL_FAILED==="
+  fi
+}
+trap on_exit EXIT
+
+# Only ever run from the live installation environment (root filesystem in RAM)
+if ! awk '$2 == "/" && $3 == "tmpfs" {found = 1} END {exit !found}' /proc/mounts; then
+  exit 0
+fi
+
+exec >> "${INSTALL_LOG}" 2>&1
+
+say "===MODERSERVER_INSTALL_STARTED==="
+
+# 1. Locate the installation media
+MEDIA=""
+for dir in /media/*; do
+  if [ -d "${dir}/moderserver/bootstrap" ]; then
+    MEDIA="${dir}"
+    break
+  fi
+done
+if [ -z "${MEDIA}" ]; then
+  echo "ModerServer payload not found on any mounted media"
+  exit 1
+fi
+PAYLOAD="${MEDIA}/moderserver"
+
+MEDIA_DEV="$(awk -v m="${MEDIA}" '$2 == m {print $1; exit}' /proc/mounts)"
+MEDIA_DISK="$(basename "${MEDIA_DEV}")"
+if [ -e "/sys/class/block/${MEDIA_DISK}/partition" ]; then
+  MEDIA_DISK="$(basename "$(readlink -f "/sys/class/block/${MEDIA_DISK}/..")")"
+fi
+
+# 2. Candidate disks: fixed disks other than the installation media
+is_blank() {
+  [ -z "$(blkid "/dev/$1" 2>/dev/null)" ] || return 1
+  for partition in "/sys/block/$1/$1"*; do
+    [ -e "${partition}" ] && return 1
+  done
+  return 0
+}
+
+DISKS=""
+DISK_COUNT=0
+for dev in /sys/block/*; do
+  name="$(basename "${dev}")"
+  case "${name}" in
+    loop*|sr*|ram*|fd*|zram*|dm-*|md*|nbd*) continue ;;
+  esac
+  [ "${name}" = "${MEDIA_DISK}" ] && continue
+  [ -b "/dev/${name}" ] || continue
+  [ "$(cat "${dev}/removable")" = "0" ] || continue
+  [ "$(cat "${dev}/size")" -gt 0 ] || continue
+  DISKS="${DISKS} ${name}"
+  DISK_COUNT=$((DISK_COUNT + 1))
+done
+
+if [ "${DISK_COUNT}" -eq 0 ]; then
+  echo "No internal disk found to install ModerServer on"
+  exit 1
+fi
+
+DISK=""
+# shellcheck disable=SC2086
+set -- ${DISKS}
+if [ "${DISK_COUNT}" -eq 1 ] && is_blank "$1"; then
+  DISK="$1"
+else
+  say ""
+  if blkid | grep -q "LABEL=\"${ROOT_LABEL}\""; then
+    say "ModerServer is already installed on this machine."
+    say "To start it, remove the installation media and reboot."
+    say ""
+  fi
+  say "Disks found:"
+  for name in ${DISKS}; do
+    size_gb=$(($(cat "/sys/block/${name}/size") / 2097152))
+    model="$(cat "/sys/block/${name}/device/model" 2>/dev/null || echo "")"
+    if is_blank "${name}"; then state="blank"; else state="CONTAINS DATA"; fi
+    say "  ${name}  ${size_gb} GB  ${model}  [${state}]"
+  done
+  say ""
+  while [ -z "${DISK}" ]; do
+    ask "Type the name of the disk to ERASE and install ModerServer on, or 'off' to power off:"
+    if [ "${REPLY}" = "off" ]; then
+      poweroff
+      exit 0
+    fi
+    for name in ${DISKS}; do
+      [ "${REPLY}" = "${name}" ] && DISK="${name}"
+    done
+  done
+fi
+DISK_DEV="/dev/${DISK}"
+
+# 3. Install the base system from the packages bundled on the media
+say "Installing ModerServer on ${DISK_DEV} (this takes a few minutes)..."
+
+cat << EOF_REPOS > /etc/apk/repositories
+${MEDIA}/apks
+${PAYLOAD}/apks
+EOF_REPOS
+apk update --no-network
+
+# -s 0: no swap partition (ZRAM provides swap). The kernel logs to the first
+# serial port when there is one and keeps the screen as the main console.
+ERASE_DISKS="${DISK_DEV}" \
+KERNELOPTS="quiet console=ttyS0,115200 console=tty0" \
+MKFS_OPTS_ROOT="-L ${ROOT_LABEL}" \
+  setup-disk -m sys -s 0 "${DISK_DEV}" < /dev/null
+
+# 4. Mount the installed system
+mdev -s
+ROOT_DEV="$(blkid | awk -F: -v l="LABEL=\"${ROOT_LABEL}\"" 'index($0, l) {print $1; exit}')"
+if [ -z "${ROOT_DEV}" ]; then
+  echo "Installed root filesystem (${ROOT_LABEL}) not found on ${DISK_DEV}"
+  exit 1
+fi
+mount "${ROOT_DEV}" "${TARGET}"
+for mountpoint in /boot /boot/efi; do
+  boot_dev="$(awk -v m="${mountpoint}" '$1 !~ /^#/ && $2 == m {print $1}' "${TARGET}/etc/fstab")"
+  if [ -n "${boot_dev}" ]; then
+    mount "${boot_dev}" "${TARGET}${mountpoint}"
+  fi
+done
+mount -t proc none "${TARGET}/proc"
+mount --bind /dev "${TARGET}/dev"
+mount --bind /sys "${TARGET}/sys"
+
+# 5. The live environment's installer hook must not exist on the installed system
+rm -f "${TARGET}/etc/local.d/moderserver-install.start" "${TARGET}/etc/runlevels/default/local"
+
+# 6. Identity and networking: DHCP on every wired interface
+echo "moderserver" > "${TARGET}/etc/hostname"
+cat << 'EOF_HOSTS' > "${TARGET}/etc/hosts"
+127.0.0.1	moderserver localhost
+::1		moderserver localhost
+EOF_HOSTS
+
+WIRED_INTERFACES=""
+for iface in /sys/class/net/*; do
+  name="$(basename "${iface}")"
+  [ "${name}" = "lo" ] && continue
+  [ -e "${iface}/device" ] || continue
+  [ -d "${iface}/wireless" ] && continue
+  WIRED_INTERFACES="${WIRED_INTERFACES} ${name}"
+done
+# No network card detected during installation: still configure the first one
+# so the server comes up as soon as a card is present
+[ -n "${WIRED_INTERFACES}" ] || WIRED_INTERFACES="eth0"
+
+{
+  echo "auto lo"
+  echo "iface lo inet loopback"
+  for name in ${WIRED_INTERFACES}; do
+    echo ""
+    echo "auto ${name}"
+    echo "iface ${name} inet dhcp"
+  done
+} > "${TARGET}/etc/network/interfaces"
+
+for service in networking hwclock seedrng; do
+  if [ ! -L "${TARGET}/etc/runlevels/boot/${service}" ]; then
+    chroot "${TARGET}" rc-update add "${service}" boot
+  fi
+done
+
+# 7. ModerServer host configuration, K3s, platform images and GitOps bootstrap
+say "Configuring the ModerServer host..."
+sh "${PAYLOAD}/bootstrap/setup-host.sh" \
+  --root "${TARGET}" \
+  --offline-repo "${MEDIA}/apks" \
+  --offline-repo "${PAYLOAD}/apks"
+
+# 8. The key that signed the media's package index is only trusted during installation
+rm -f "${TARGET}"/etc/apk/keys/moderserver-installer-*.rsa.pub
+
+cp "${INSTALL_LOG}" "${TARGET}/var/log/moderserver-install.log"
+
+sync
+umount "${TARGET}/sys" "${TARGET}/dev" "${TARGET}/proc"
+for mountpoint in /boot/efi /boot; do
+  if awk -v m="${TARGET}${mountpoint}" '$2 == m {found = 1} END {exit !found}' /proc/mounts; then
+    umount "${TARGET}${mountpoint}"
+  fi
+done
+umount "${TARGET}"
+sync
+
+say ""
+say "ModerServer is installed on ${DISK_DEV}."
+say "Remove the installation media, then power the machine back on."
+say "===MODERSERVER_INSTALL_COMPLETE==="
+sleep 5
+poweroff

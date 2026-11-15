@@ -19,7 +19,6 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.s
 require_tool docker
 
 TARGET_DIR="${1:-.}"
-REGISTRY="${REGISTRY:-ghcr.io/moderserver}"
 
 log_info "[Conformance:Static] Scanning container images for CVE vulnerabilities with trivy (${TRIVY_VERSION})..."
 
@@ -36,24 +35,17 @@ for df in ${DOCKERFILES}; do
   if [[ "${df_name}" == Dockerfile.* ]]; then
     COMPONENT_NAME="${COMPONENT_NAME}-${df_name#Dockerfile.}"
   fi
-  VERSION="latest"
-  if [[ -f "${COMPONENT_DIR}/Chart.yaml" ]]; then
-    VERSION=$(awk '/^appVersion:/ {print $2}' "${COMPONENT_DIR}/Chart.yaml" | tr -d '"' | tr '+' '-')
-  fi
-  IMAGE_TAG="${REGISTRY}/${COMPONENT_NAME}:${VERSION:-latest}"
+  IMAGE_TAG="${REGISTRY}/${COMPONENT_NAME}:$(component_image_tag "${COMPONENT_DIR}")"
 
+  # An image that cannot be built is a conformance failure, never a skipped scan
   if ! docker image inspect "${IMAGE_TAG}" >/dev/null 2>&1; then
     log_info "Building image locally for vulnerability scanning: ${IMAGE_TAG}..."
-    docker build -f "${df}" -t "${IMAGE_TAG}" "${COMPONENT_DIR}" >/dev/null 2>&1 || true
+    docker build -f "${df}" -t "${IMAGE_TAG}" "${COMPONENT_DIR}" >/dev/null
   fi
 
-  if docker image inspect "${IMAGE_TAG}" >/dev/null 2>&1; then
-    log_info "Scanning image: ${IMAGE_TAG}"
-    run_tool_or_docker trivy "${TRIVY_IMAGE}" image --scanners vuln --exit-code 1 --severity CRITICAL,HIGH "${IMAGE_TAG}"
-    log_pass "trivy vulnerability scan passed for: ${COMPONENT_NAME}"
-  else
-    log_info "Image '${IMAGE_TAG}' not found locally and could not be built, skipping image scan."
-  fi
+  log_info "Scanning image: ${IMAGE_TAG}"
+  run_tool_or_docker trivy "${TRIVY_IMAGE}" image --scanners vuln --exit-code 1 --severity CRITICAL,HIGH "${IMAGE_TAG}"
+  log_pass "trivy vulnerability scan passed for: ${COMPONENT_NAME}"
 done
 
 log_pass "Container image vulnerability conformance verified."

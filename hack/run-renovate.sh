@@ -34,7 +34,7 @@ docker run --rm \
   -e RENOVATE_DRY_RUN=lookup \
   -e GITHUB_COM_TOKEN="${GITHUB_TOKEN}" \
   -e LOG_LEVEL=debug \
-  renovate/renovate:latest 2>&1 | python3 -c '
+  "${RENOVATE_IMAGE}" 2>&1 | python3 -c '
 import sys, json, re
 
 capturing = False

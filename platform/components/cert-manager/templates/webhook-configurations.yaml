@@ -25,7 +25,7 @@ webhooks:
     admissionReviewVersions: ["v1"]
     matchPolicy: Equivalent
     timeoutSeconds: 10
-    failurePolicy: Ignore
+    failurePolicy: Fail
     sideEffects: None
     clientConfig:
       service:
@@ -63,7 +63,7 @@ webhooks:
     admissionReviewVersions: ["v1"]
     matchPolicy: Equivalent
     timeoutSeconds: 10
-    failurePolicy: Ignore
+    failurePolicy: Fail
     sideEffects: None
     clientConfig:
       service:

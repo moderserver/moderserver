@@ -60,4 +60,9 @@ log_info "  Stage 3: Workload Isolation & DNS Assertions"
 log_info "=========================================================="
 "${SCRIPT_DIR}/test-workload.sh"
 
+log_info "=========================================================="
+log_info "  Stage 4: Gateway Routing & TLS Assertions"
+log_info "=========================================================="
+"${SCRIPT_DIR}/test-gateway.sh"
+
 log_pass "End-to-End infrastructure and security assertions PASSED."

@@ -55,4 +55,59 @@ if kubectl auth can-i create pods --as=system:serviceaccount:default:default >/d
 fi
 echo "    [PASS] Default service account permissions properly restricted."
 
+# 4. Verify namespaces without Pod Security labels still enforce the baseline profile
+echo "    Checking cluster-wide Pod Security defaults..."
+if kubectl run e2e-privileged-test --image=alpine --restart=Never --privileged -- true >/dev/null 2>&1; then
+  kubectl delete pod e2e-privileged-test --ignore-not-found=true >/dev/null 2>&1
+  echo "FAIL: A privileged pod was admitted in a namespace without Pod Security labels." >&2
+  exit 1
+fi
+echo "    [PASS] Privileged pods are rejected by default."
+
+# 5. Verify platform credentials are generated per install, never shipped in Git
+echo "    Checking Argo CD credentials are generated on the node..."
+REDIS_PASSWORD=$(kubectl get secret -n argocd argocd-redis -o jsonpath='{.data.auth}' | base64 -d)
+SERVER_KEY=$(kubectl get secret -n argocd argocd-secret -o jsonpath='{.data.server\.secretkey}' | base64 -d)
+if [ "${#REDIS_PASSWORD}" -lt 16 ] || [ "${#SERVER_KEY}" -lt 16 ]; then
+  echo "FAIL: Argo CD Redis password or server secret key is missing or too short." >&2
+  exit 1
+fi
+if grep -rqF -e "${REDIS_PASSWORD}" -e "${SERVER_KEY}" "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/platform"; then
+  echo "FAIL: Argo CD credentials found in the platform sources." >&2
+  exit 1
+fi
+echo "    [PASS] Argo CD credentials are unique to this install."
+
+# 6. Verify network isolation: an arbitrary pod cannot reach platform internals
+echo "    Checking network isolation of platform services..."
+NP_POD="e2e-netpol-check"
+# renovate: datasource=docker depName=alpine
+NP_ALPINE_VERSION="3.24.4"
+NP_IMAGE="alpine:${NP_ALPINE_VERSION}"
+NP_SCRIPT='for t in argocd-redis.argocd:6379 argocd-server.argocd:80 argocd-repo-server.argocd:8081 moderserver-gateway-nginx.nginx-gateway:443; do if nc -w 3 -z ${t%:*} ${t#*:} 2>/dev/null; then echo "OPEN $t"; else echo "BLOCKED $t"; fi; done'
+kubectl delete pod "${NP_POD}" --ignore-not-found=true >/dev/null 2>&1
+kubectl run "${NP_POD}" \
+  --image="${NP_IMAGE}" \
+  --restart=Never \
+  --overrides='{"spec":{"automountServiceAccountToken":false,"securityContext":{"runAsNonRoot":true,"runAsUser":1000,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"check","image":"'"${NP_IMAGE}"'","command":["sh","-c",'"$(printf '%s' "${NP_SCRIPT}" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"'],"securityContext":{"readOnlyRootFilesystem":true,"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}' \
+  >/dev/null
+if ! kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/"${NP_POD}" --timeout=120s >/dev/null; then
+  echo "FAIL: Network isolation probe pod did not complete." >&2
+  kubectl describe pod "${NP_POD}" >&2 || true
+  kubectl delete pod "${NP_POD}" >/dev/null 2>&1 || true
+  exit 1
+fi
+NP_RESULT=$(kubectl logs "${NP_POD}")
+kubectl delete pod "${NP_POD}" >/dev/null 2>&1
+EXPECTED_RESULT="BLOCKED argocd-redis.argocd:6379
+BLOCKED argocd-server.argocd:80
+BLOCKED argocd-repo-server.argocd:8081
+OPEN moderserver-gateway-nginx.nginx-gateway:443"
+if [ "${NP_RESULT}" != "${EXPECTED_RESULT}" ]; then
+  echo "FAIL: Unexpected network reachability from an unprivileged pod:" >&2
+  echo "${NP_RESULT}" >&2
+  exit 1
+fi
+echo "    [PASS] Platform internals are isolated; only the gateway is reachable."
+
 echo "--> [PASS] All security assertions passed."

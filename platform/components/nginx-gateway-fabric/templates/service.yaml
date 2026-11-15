@@ -8,6 +8,10 @@ metadata:
 spec:
   type: ClusterIP
   ports:
+    # NGINX data plane agents connect back to the control plane on this port
+    - name: agent-grpc
+      port: 443
+      targetPort: agent-grpc
     - name: health
       port: 9099
       targetPort: health

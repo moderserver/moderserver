@@ -4,7 +4,7 @@ metadata:
   name: moderserver-os-upgrade
   namespace: system-upgrade
   labels:
-    app.kubernetes.io/part-of: moderserver
+    {{- include "common.labels.standard" . | nindent 4 }}
 spec:
   concurrency: 1
   nodeSelector:
@@ -13,15 +13,12 @@ spec:
         operator: In
         values: ["true"]
   serviceAccountName: system-upgrade
+  # Cordon only: on a single-node server a drain has nowhere to move workloads to.
   cordon: true
-  drain:
-    force: true
-    skipWaitForDeleteTimeout: 60
   # renovate: datasource=docker depName=alpine
   version: "3.24.4"
   upgrade:
-    # renovate: datasource=docker depName=alpine
-    image: "ghcr.io/moderserver/os-upgrade:3.24.4"
+    image: {{ include "common.images.ref" (dict "ctx" . "name" "upgrade") | quote }}
     envs:
       - name: TARGET_OS_VERSION
         # renovate: datasource=docker depName=alpine

@@ -16,32 +16,19 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
-require_tool helm
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 TARGET_DIR="${1:-.}"
 
 log_info "[Conformance:Static] Auditing manifest best practices with kube-linter (${KUBE_LINTER_VERSION})..."
 
-CHARTS=$(find "${TARGET_DIR}" -type f -name "Chart.yaml" -exec dirname {} \; 2>/dev/null || true)
-if [[ -z "${CHARTS}" ]]; then
+render_charts "${TARGET_DIR}"
+if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
   log_info "No Helm chart found in ${TARGET_DIR}, skipping."
   exit 0
 fi
 
-TMP_DIR=$(mktemp -d)
-chmod 755 "${TMP_DIR}"
-trap 'rm -rf "${TMP_DIR}"' EXIT
-
-for chart in ${CHARTS}; do
-  APP_NAME=$(basename "${chart}")
-  MANIFEST="${TMP_DIR}/${APP_NAME}.yaml"
-  (
-    cd "${chart}"
-    helm dependency update >/dev/null 2>&1 || true
-    helm template --include-crds "${APP_NAME}-test" . > "${MANIFEST}"
-  )
-  chmod 644 "${MANIFEST}"
-
+for MANIFEST in "${MANIFESTS[@]}"; do
   run_tool_or_docker kube-linter "${KUBE_LINTER_IMAGE}" lint "${MANIFEST}"
 done
 

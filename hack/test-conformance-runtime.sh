@@ -21,27 +21,8 @@ require_tool kubectl
 
 NAMESPACE="${1:-all}"
 
-CLUSTER_NAME="moderserver-runtime-cluster"
-export CLUSTER_NAME
 
-STOP_ON_EXIT=false
-
-cleanup() {
-  if [[ "${STOP_ON_EXIT}" == "true" ]]; then
-    log_info "Stopping Runtime Conformance cluster..."
-    "${SCRIPT_DIR}/run-qemu.sh" --stop >/dev/null 2>&1 || true
-  fi
-}
-trap cleanup EXIT INT TERM
-
-if [[ ! -f "${KUBECONFIG:-}" ]]; then
-  STOP_ON_EXIT=true
-  log_info "Bootstrapping ModerServer cluster via hack/run-qemu.sh..."
-  "${SCRIPT_DIR}/run-qemu.sh" --daemon
-  "${SCRIPT_DIR}/run-qemu.sh" --wait
-  KUBECONFIG_PATH=$("${SCRIPT_DIR}/run-qemu.sh" --kubeconfig)
-  export KUBECONFIG="${KUBECONFIG_PATH}"
-fi
+use_test_cluster
 
 log_info "Executing Runtime Conformance analysis on namespace '${NAMESPACE}'..."
 "${CORE_ROOT}/test/conformance/run.sh" --runtime "${NAMESPACE}"

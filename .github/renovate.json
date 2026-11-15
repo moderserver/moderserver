@@ -11,18 +11,26 @@
   ],
   "packageRules": [
     {
-      "matchFileNames": ["hack/lib/common.sh"],
+      "matchFileNames": [
+        "hack/lib/common.sh"
+      ],
       "groupName": "Developer Tooling",
-      "schedule": ["before 6am on monday"],
+      "schedule": [
+        "before 6am on monday"
+      ],
       "automerge": false
     },
     {
-      "matchPackageNames": ["k3s-io/k3s"],
+      "matchPackageNames": [
+        "k3s-io/k3s"
+      ],
       "groupName": "K3s Kubernetes Runtime",
       "automerge": false
     },
     {
-      "matchPackageNames": ["alpine"],
+      "matchPackageNames": [
+        "alpine"
+      ],
       "groupName": "Alpine Host OS",
       "automerge": false
     }
@@ -33,10 +41,8 @@
       "fileMatch": [
         "^hack/lib/common\\.sh$",
         "^bootstrap/setup-host\\.sh$",
-        "^os/build-image\\.sh$",
         "^test/e2e/test-workload\\.sh$",
-        "^hack/run-qemu\\.sh$",
-        "^hack/build-components\\.sh$",
+        "^test/e2e/test-security\\.sh$",
         "^platform/components/upgrade/run-upgrade\\.sh$"
       ],
       "matchStrings": [
@@ -55,15 +61,18 @@
     },
     {
       "customType": "regex",
-      "fileMatch": ["^platform/components/upgrade/templates/os-plan\\.yaml$"],
+      "fileMatch": [
+        "^platform/components/upgrade/templates/os-plan\\.yaml$"
+      ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*(?:version|value):\\s*\"(?<currentValue>[^\"]+?)\"",
-        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*image:\\s*\"[^:\"]+:(?<currentValue>[^\"]+?)\""
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\n\\s*(?:version|value):\\s*\"(?<currentValue>[^\"]+?)\""
       ]
     },
     {
       "customType": "regex",
-      "fileMatch": ["^platform/components/[^/]+/Chart\\.yaml$"],
+      "fileMatch": [
+        "^platform/components/[^/]+/Chart\\.yaml$"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\nappVersion:\\s*\"(?<currentValue>[^\"]+?)\""
       ]

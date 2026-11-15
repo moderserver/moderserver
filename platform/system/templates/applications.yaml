@@ -16,11 +16,14 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: {{ if $.Values.gitops.localDev }}{{ $.Values.gitops.localRepoURL }}{{ else }}{{ $.Values.gitops.repoURL }}{{ end }}
+    repoURL: {{ $.Values.gitops.repoURL | quote }}
     targetRevision: {{ $.Values.gitops.targetRevision | quote }}
     path: {{ $config.path }}
     helm:
       releaseName: {{ $config.name | default $key }}
+      valuesObject:
+        global:
+          {{- toYaml $.Values.global | nindent 10 }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ $config.namespace }}
@@ -28,6 +31,14 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    # A sync can fail transiently while a dependency is still starting
+    # (admission webhooks, freshly registered CRDs): retry instead of giving up.
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
@@ -39,5 +50,8 @@ spec:
       jqPathExpressions:
         - .spec.conversion
         - .status
+    {{- with $config.ignoreDifferences }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 {{- end }}
 {{- end }}

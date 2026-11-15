@@ -13,78 +13,150 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Remasters the upstream Alpine Linux ISO into the ModerServer installer.
+# Runs inside an Alpine container started by os/build-image.sh.
+#
+# Added to the upstream image:
+#   /moderserver/bootstrap   host configuration, K3s binary, platform images and
+#                            GitOps bootstrap manifests
+#   /moderserver/os          kernel sysctl settings
+#   /moderserver/apks        signed apk repository with everything an offline
+#                            disk installation needs (kernel, bootloaders,
+#                            firmware, host packages)
+#   /localhost.apkovl.tar.gz live-environment overlay that starts the installer
+#
+# The upstream boot records are replayed unchanged, so the result boots from
+# USB sticks and optical media, in BIOS and UEFI mode, like the original.
+
 set -eu
 
-apk add --no-cache xorriso mtools curl ca-certificates
+apk add --no-cache xorriso curl ca-certificates abuild openssl >/dev/null
 
+ARCH="x86_64"
 CACHE_DIR="/output/.cache"
 mkdir -p "${CACHE_DIR}"
 
+# fetch_verified <url> <checksum-file-url> <name-in-checksum-file> <destination>
+# Downloads a release artifact and checks it against the checksum file
+# published next to it. Cached downloads are verified again on every build.
+fetch_verified() {
+  url="$1"
+  sums_url="$2"
+  sums_name="$3"
+  dest="$4"
+  expected="$(curl -sfL "${sums_url}" | awk -v f="${sums_name}" '$2 == f || $2 == "*" f {print $1}')"
+  if [ -z "${expected}" ]; then
+    echo "No published checksum for ${sums_name} at ${sums_url}" >&2
+    exit 1
+  fi
+  if [ ! -f "${dest}" ] || [ "$(sha256sum "${dest}" | cut -d' ' -f1)" != "${expected}" ]; then
+    echo "--> Fetching ${url}..."
+    curl -sfL "${url}" -o "${dest}.tmp"
+    mv "${dest}.tmp" "${dest}"
+  fi
+  actual="$(sha256sum "${dest}" | cut -d' ' -f1)"
+  if [ "${actual}" != "${expected}" ]; then
+    echo "Checksum mismatch for ${url}: expected ${expected}, got ${actual}" >&2
+    rm -f "${dest}"
+    exit 1
+  fi
+}
+
+# The standard image carries the LTS kernel with drivers for physical hardware
+# (the virt flavour only boots virtual machines).
 ALPINE_BRANCH="${ALPINE_ISO_VERSION%.*}"
-BASE_ISO="${CACHE_DIR}/alpine-virt-${ALPINE_ISO_VERSION}.iso"
-if [ ! -f "${BASE_ISO}" ]; then
-  echo "--> Fetching Alpine virt base image (${ALPINE_ISO_VERSION})..."
-  curl -sL "https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/releases/x86_64/alpine-virt-${ALPINE_ISO_VERSION}-x86_64.iso" -o "${BASE_ISO}"
+BASE_ISO_NAME="alpine-standard-${ALPINE_ISO_VERSION}-${ARCH}.iso"
+BASE_ISO_URL="https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/releases/${ARCH}/${BASE_ISO_NAME}"
+BASE_ISO="${CACHE_DIR}/${BASE_ISO_NAME}"
+fetch_verified "${BASE_ISO_URL}" "${BASE_ISO_URL}.sha256" "${BASE_ISO_NAME}" "${BASE_ISO}"
+
+K3S_RELEASE_URL="https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}"
+K3S_BIN="${CACHE_DIR}/k3s-${K3S_VERSION}"
+fetch_verified "${K3S_RELEASE_URL}/k3s" "${K3S_RELEASE_URL}/sha256sum-amd64.txt" "k3s" "${K3S_BIN}"
+
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "${WORK_DIR}"' EXIT
+PAYLOAD="${WORK_DIR}/moderserver"
+OVERLAY="${WORK_DIR}/ovl"
+mkdir -p "${PAYLOAD}/bootstrap" "${PAYLOAD}/os" "${PAYLOAD}/apks/${ARCH}" "${OVERLAY}"
+
+echo "--> Assembling host bootstrap payload..."
+cp -r "${CORE_ROOT}/bootstrap"/. "${PAYLOAD}/bootstrap/"
+cp -r "${CORE_ROOT}/os/sysctl.d" "${PAYLOAD}/os/"
+cp "${K3S_BIN}" "${PAYLOAD}/bootstrap/k3s"
+chmod 755 "${PAYLOAD}/bootstrap/k3s"
+
+if [ -z "$(ls -A /output/images/*.tar 2>/dev/null)" ]; then
+  echo "No platform images in /output/images (run hack/build-components.sh --save-dir)" >&2
+  exit 1
 fi
+mkdir -p "${PAYLOAD}/bootstrap/images" "${PAYLOAD}/bootstrap/manifests"
+cp /output/images/*.tar "${PAYLOAD}/bootstrap/images/"
+cp /output/manifests/argocd-crds.yaml /output/manifests/argocd.yaml "${PAYLOAD}/bootstrap/manifests/"
 
-K3S_CACHE="${CACHE_DIR}/k3s"
-if [ ! -f "${K3S_CACHE}" ]; then
-  echo "--> Caching pinned K3s binary (${K3S_VERSION})..."
-  curl -sfL "https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s" -o "${K3S_CACHE}"
-  chmod 755 "${K3S_CACHE}"
-fi
+# Packages the upstream image does not ship but an offline installation needs:
+# the installed kernel, both bootloaders (BIOS and UEFI) and the host packages.
+echo "--> Bundling offline package repository..."
+HOST_PACKAGES="$(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "${CORE_ROOT}/bootstrap/host-packages" | tr '\n' ' ')"
+INSTALLER_PACKAGES="alpine-base linux-lts linux-firmware-none mkinitfs syslinux grub-efi efibootmgr dosfstools e2fsprogs sfdisk"
+# shellcheck disable=SC2086
+apk fetch --quiet --recursive --output "${PAYLOAD}/apks/${ARCH}" ${INSTALLER_PACKAGES} ${HOST_PACKAGES}
 
-echo "--> Extracting base ISO contents..."
-WORK_DIR=$(mktemp -d)
-chmod 755 "${WORK_DIR}"
-mkdir -p "${WORK_DIR}/iso-extract" "${WORK_DIR}/ovl/etc/runlevels/default"
+# The index is signed with a key generated for this build only. Its public half
+# is trusted by the live installer environment and removed from the installed
+# system; the private half never leaves this container.
+KEY_NAME="moderserver-installer-$(date +%Y%m%d%H%M%S)"
+openssl genrsa -out "${WORK_DIR}/${KEY_NAME}.rsa" 2048 2>/dev/null
+openssl rsa -in "${WORK_DIR}/${KEY_NAME}.rsa" -pubout -out "${WORK_DIR}/${KEY_NAME}.rsa.pub" 2>/dev/null
+(
+  cd "${PAYLOAD}/apks/${ARCH}"
+  apk index --quiet --rewrite-arch "${ARCH}" -o APKINDEX.tar.gz ./*.apk
+  abuild-sign -q -k "${WORK_DIR}/${KEY_NAME}.rsa" -p "${KEY_NAME}.rsa.pub" APKINDEX.tar.gz
+)
 
-xorriso -osirrox on -indev "${BASE_ISO}" -extract / "${WORK_DIR}/iso-extract" >/dev/null 2>&1
-chmod -R u+w "${WORK_DIR}/iso-extract"
+echo "--> Packaging installer overlay..."
+cp -r "${CORE_ROOT}/os/overlay"/. "${OVERLAY}/"
+mkdir -p "${OVERLAY}/etc/apk/keys" "${OVERLAY}/etc/runlevels/default"
+cp "${WORK_DIR}/${KEY_NAME}.rsa.pub" "${OVERLAY}/etc/apk/keys/"
+ln -s /etc/init.d/local "${OVERLAY}/etc/runlevels/default/local"
+# Ask the Alpine init to enable its standard live services (device manager,
+# hardware drivers, kernel modules) even though an overlay is present
+touch "${OVERLAY}/etc/.default_boot_services"
+(cd "${OVERLAY}" && tar -czf "${WORK_DIR}/localhost.apkovl.tar.gz" .)
 
-echo "--> Pre-baking host runtime packages into bootstrap..."
-mkdir -p "${WORK_DIR}/iso-extract/root/bootstrap/apks"
-apk fetch --no-cache -R -o "${WORK_DIR}/iso-extract/root/bootstrap/apks" \
-  curl ca-certificates iptables ebtables ip6tables cgroup-tools wireguard-tools chrony acpid zram-init e2fsprogs >/dev/null 2>&1 || true
+# Boot menu: no prompt, kernel messages on the first serial port when there is
+# one, screen as the main console
+echo "--> Adjusting boot configuration..."
+xorriso -osirrox on -indev "${BASE_ISO}" \
+  -extract /boot/syslinux/syslinux.cfg "${WORK_DIR}/syslinux.cfg" \
+  -extract /boot/grub/grub.cfg "${WORK_DIR}/grub.cfg" >/dev/null 2>&1
+chmod u+w "${WORK_DIR}/syslinux.cfg" "${WORK_DIR}/grub.cfg"
+CONSOLE_OPTS="console=ttyS0,115200 console=tty0"
+sed -i \
+  -e 's/^TIMEOUT .*/TIMEOUT 10/' \
+  -e 's/^PROMPT .*/PROMPT 0/' \
+  -e "s#^\(APPEND .*\)\$#\1 ${CONSOLE_OPTS}#" \
+  "${WORK_DIR}/syslinux.cfg"
+sed -i \
+  -e 's/^set timeout=.*/set timeout=1/' \
+  -e "s#^\(linux[[:space:]].*\)\$#\1 ${CONSOLE_OPTS}#" \
+  "${WORK_DIR}/grub.cfg"
+grep -q "${CONSOLE_OPTS}" "${WORK_DIR}/syslinux.cfg"
+grep -q "${CONSOLE_OPTS}" "${WORK_DIR}/grub.cfg"
 
-echo "--> Injecting ModerServer OS unattended answerfile and bootstrap manifests..."
-mkdir -p "${WORK_DIR}/iso-extract/etc" "${WORK_DIR}/iso-extract/root/bootstrap" "${WORK_DIR}/iso-extract/root/os/sysctl.d"
-cp "${CORE_ROOT}/os/answers.conf" "${WORK_DIR}/iso-extract/etc/answers.conf"
-cp -r "${CORE_ROOT}/bootstrap"/* "${WORK_DIR}/iso-extract/root/bootstrap/"
-cp -r "${CORE_ROOT}/os/sysctl.d"/* "${WORK_DIR}/iso-extract/root/os/sysctl.d/"
-cp "${K3S_CACHE}" "${WORK_DIR}/iso-extract/root/bootstrap/k3s"
+echo "--> Generating bootable ModerServer installer ISO..."
+rm -f "${IMAGE_OUT}"
+xorriso \
+  -indev "${BASE_ISO}" \
+  -outdev "${IMAGE_OUT}" \
+  -boot_image any replay \
+  -map "${PAYLOAD}" /moderserver \
+  -map "${WORK_DIR}/localhost.apkovl.tar.gz" /localhost.apkovl.tar.gz \
+  -map "${WORK_DIR}/syslinux.cfg" /boot/syslinux/syslinux.cfg \
+  -map "${WORK_DIR}/grub.cfg" /boot/grub/grub.cfg \
+  >/dev/null 2>"${WORK_DIR}/xorriso.log" || {
+    cat "${WORK_DIR}/xorriso.log" >&2
+    exit 1
+  }
 
-mkdir -p "${WORK_DIR}/iso-extract/root/bootstrap/images"
-if [ -d "${CORE_ROOT}/_output/images" ] && [ "$(ls -A "${CORE_ROOT}/_output/images" 2>/dev/null)" ]; then
-  echo "--> Pre-baking platform container images into bootstrap..."
-  cp "${CORE_ROOT}/_output/images"/*.tar "${WORK_DIR}/iso-extract/root/bootstrap/images/" 2>/dev/null || true
-fi
-
-mkdir -p "${WORK_DIR}/iso-extract/root/bootstrap/manifests"
-if [ -d "/output/manifests" ] && [ "$(ls -A /output/manifests 2>/dev/null)" ]; then
-  echo "--> Pre-baking platform GitOps bootstrap manifests into ISO..."
-  cp /output/manifests/*.yaml "${WORK_DIR}/iso-extract/root/bootstrap/manifests/" 2>/dev/null || true
-fi
-
-echo "--> Packaging ModerServer automated startup overlay..."
-cp -r "${CORE_ROOT}/os/overlay"/* "${WORK_DIR}/ovl/"
-ln -s /etc/init.d/local "${WORK_DIR}/ovl/etc/runlevels/default/local"
-(cd "${WORK_DIR}/ovl" && tar -czf "${WORK_DIR}/iso-extract/localhost.apkovl.tar.gz" .)
-
-# Configure syslinux timeout to 1 and route console to serial
-sed -i "s/timeout .*/timeout 1/" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
-sed -i "s/prompt .*/prompt 0/I" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
-sed -i "s#APPEND .*#APPEND modules=loop,squashfs,sd-mod,usb-storage,virtio_blk,virtio_pci,virtio_net,ext4 console=ttyS0,115200 quiet#" "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg" || true
-echo "SERIAL 0 115200" >> "${WORK_DIR}/iso-extract/boot/syslinux/syslinux.cfg"
-
-echo "--> Generating bootable ModerServer OS ISO..."
-xorriso -as mkisofs \
-  -r -V "MODERSERVER" \
-  -o "${IMAGE_OUT}" \
-  -b boot/syslinux/isolinux.bin \
-  -c boot/syslinux/boot.cat \
-  -no-emul-boot -boot-load-size 4 -boot-info-table \
-  "${WORK_DIR}/iso-extract" >/dev/null 2>&1
-
-rm -rf "${WORK_DIR}"
-echo "==> [PASS] ModerServer ISO created successfully."
+echo "==> [PASS] ModerServer installer ISO created successfully."

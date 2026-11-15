@@ -24,26 +24,10 @@ spec:
     spec:
       serviceAccountName: cert-manager-webhook
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        runAsGroup: 65534
-        fsGroup: 65534
-        seccompProfile:
-          type: RuntimeDefault
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
-                  - key: kubernetes.io/os
-                    operator: In
-                    values:
-                      - linux
+        {{- include "common.security.pod" (dict) | nindent 8 }}
       containers:
         - name: cert-manager-webhook
-          image: "ghcr.io/moderserver/cert-manager-webhook:{{ .Chart.AppVersion }}"
+          image: {{ include "common.images.ref" (dict "ctx" . "name" "cert-manager-webhook") | quote }}
           imagePullPolicy: IfNotPresent
           args:
             - --v=2
@@ -64,12 +48,7 @@ spec:
             initialDelaySeconds: 3
             periodSeconds: 10
           securityContext:
-            {{- include "common.security.container" . | nindent 12 }}
-            runAsNonRoot: true
-            runAsUser: 65534
-            runAsGroup: 65534
-            seccompProfile:
-              type: RuntimeDefault
+            {{- include "common.security.container" (dict) | nindent 12 }}
           resources:
             requests:
               cpu: 25m
@@ -77,14 +56,4 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
-      nodeSelector:
-        node-role.kubernetes.io/control-plane: "true"
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-          effect: NoSchedule
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+      {{- include "common.scheduling.controlPlane" . | nindent 6 }}

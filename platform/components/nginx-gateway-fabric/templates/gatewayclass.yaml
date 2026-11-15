@@ -6,3 +6,45 @@ metadata:
     {{- include "common.labels.standard" . | nindent 4 }}
 spec:
   controllerName: gateway.nginx.org/nginx-gateway-controller
+  parametersRef:
+    group: gateway.nginx.org
+    kind: NginxProxy
+    name: moderserver-proxy
+    namespace: nginx-gateway
+---
+# Data plane configuration: how NGINX Gateway Fabric provisions the NGINX pods
+# that serve the Gateway.
+apiVersion: gateway.nginx.org/v1alpha2
+kind: NginxProxy
+metadata:
+  name: moderserver-proxy
+  namespace: nginx-gateway
+  labels:
+    {{- include "common.labels.standard" . | nindent 4 }}
+spec:
+  kubernetes:
+    deployment:
+      replicas: 1
+      container:
+        image:
+          repository: {{ printf "%s/nginx-gateway-fabric-nginx" (include "common.images.registry" .) | quote }}
+          tag: {{ include "common.images.tag" . | quote }}
+          pullPolicy: IfNotPresent
+        # A home server has no cloud load balancer: publish the Gateway listeners
+        # directly on the node's ports 80 and 443.
+        hostPorts:
+          - port: 80
+            containerPort: 80
+          - port: 443
+            containerPort: 443
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+      pod:
+        {{- include "common.scheduling.controlPlane" . | nindent 8 }}
+    service:
+      type: ClusterIP

@@ -8,7 +8,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: Helm
 app.kubernetes.io/part-of: moderserver
 {{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | replace "+" "_" | quote }}
 {{- end }}
 {{- end -}}
 

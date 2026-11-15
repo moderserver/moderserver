@@ -62,6 +62,13 @@ TRIVY_IMAGE="aquasec/trivy:${TRIVY_VERSION}"
 KUBECONFORM_VERSION="v0.8.0"
 KUBECONFORM_IMAGE="ghcr.io/yannh/kubeconform:${KUBECONFORM_VERSION}"
 
+# renovate: datasource=docker depName=renovate/renovate
+RENOVATE_VERSION="44.239.1"
+RENOVATE_IMAGE="renovate/renovate:${RENOVATE_VERSION}"
+
+# renovate: datasource=docker depName=alpine
+ALPINE_VERSION="3.24.4"
+
 # renovate: datasource=pypi depName=yamllint
 YAMLLINT_VERSION="1.38.0"
 
@@ -102,6 +109,84 @@ require_tool() {
   if ! command -v "${tool}" >/dev/null 2>&1; then
     log_error "Required tool '${tool}' is not installed or not in PATH."
     exit 1
+  fi
+}
+
+# Registry all platform component images are published to
+REGISTRY="${REGISTRY:-ghcr.io/moderserver}"
+
+# component_image_tag <component_dir>
+#
+# Content-addressed tag of a component's images: <appVersion>-<hash of build inputs>.
+# The build inputs are the Dockerfile* and *.sh files at the root of the component.
+# Must stay in sync with the "common.images.tag" Helm helper
+# (platform/common/templates/_images.tpl); hack/verify-image-tags.sh enforces it.
+component_image_tag() {
+  local comp_dir="$1"
+  local app_version="latest"
+  if [[ -f "${comp_dir}/Chart.yaml" ]]; then
+    app_version=$(awk '/^appVersion:/ {print $2}' "${comp_dir}/Chart.yaml" | tr -d '"' | tr '+' '-')
+  fi
+  local hash
+  hash=$(
+    cd "${comp_dir}"
+    {
+      find . -maxdepth 1 -type f -name 'Dockerfile*' | LC_ALL=C sort
+      find . -maxdepth 1 -type f -name '*.sh' | LC_ALL=C sort
+    } | while IFS= read -r f; do cat "${f}"; done | sha256sum | cut -c1-12
+  )
+  echo "${app_version}-${hash}"
+}
+
+# component_image_names <component_dir>
+#
+# Prints one image name per Dockerfile of the component:
+#   Dockerfile        -> <component>
+#   Dockerfile.<sub>  -> <component>-<sub>
+component_image_names() {
+  local comp_dir="$1"
+  local comp_name df suffix
+  comp_name=$(basename "${comp_dir}")
+  find "${comp_dir}" -maxdepth 1 -type f -name 'Dockerfile*' ! -name '*.dockerignore' | LC_ALL=C sort | while IFS= read -r df; do
+    suffix=$(basename "${df}")
+    if [[ "${suffix}" == Dockerfile.* ]]; then
+      echo "${comp_name}-${suffix#Dockerfile.}"
+    else
+      echo "${comp_name}"
+    fi
+  done
+}
+
+# use_test_cluster
+#
+# Gives a test script a cluster to run against. When KUBECONFIG already points
+# at one it is used as is; otherwise a ModerServer QEMU machine is installed,
+# started and waited for, and stopped again when the calling script exits.
+# Sets TEST_CLUSTER_STARTED to "true" when the machine was started here.
+use_test_cluster() {
+  TEST_CLUSTER_STARTED=false
+  if [[ -f "${KUBECONFIG:-}" ]]; then
+    return 0
+  fi
+
+  TEST_CLUSTER_STARTED=true
+  trap 'log_info "Stopping test cluster..."; "${HACK_DIR}/run-qemu.sh" --stop >/dev/null 2>&1 || true' EXIT INT TERM
+  log_info "Bootstrapping ModerServer cluster via hack/run-qemu.sh..."
+  "${HACK_DIR}/run-qemu.sh" --daemon
+  "${HACK_DIR}/run-qemu.sh" --wait
+  KUBECONFIG=$("${HACK_DIR}/run-qemu.sh" --kubeconfig)
+  export KUBECONFIG
+}
+
+# build_chart_dependencies <chart_dir>
+#
+# Packages the chart's local dependencies (the common library) into its charts/
+# directory. The archives are build outputs, not sources: they are ignored by
+# Git and rebuilt from platform/common whenever a chart is rendered.
+build_chart_dependencies() {
+  local chart="$1"
+  if grep -q '^dependencies:' "${chart}/Chart.yaml"; then
+    helm dependency build "${chart}" >/dev/null
   fi
 }
 

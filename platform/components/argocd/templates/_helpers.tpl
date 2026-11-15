@@ -1,13 +1,7 @@
 {{/*
-Argo CD standard labels with app.kubernetes.io/part-of: argocd required by Argo CD settings manager
+Standard labels, with app.kubernetes.io/part-of: argocd as required by the
+Argo CD settings manager on the ConfigMaps and Secrets it reads
 */}}
 {{- define "argocd.labels.standard" -}}
-app.kubernetes.io/name: {{ include "common.names.name" . }}
-helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-app.kubernetes.io/managed-by: Helm
-app.kubernetes.io/part-of: argocd
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
+{{- include "common.labels.standard" . | replace "app.kubernetes.io/part-of: moderserver" "app.kubernetes.io/part-of: argocd" -}}
 {{- end -}}

@@ -4,3 +4,6 @@ _output/
 *.iso
 *.img
 .DS_Store
+
+# Vendored Helm dependencies: packaged from platform/common at render time
+platform/**/charts/*.tgz

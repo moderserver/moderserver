@@ -1,2 +1,0 @@
-# Default values for cert-manager.
-# Certificate controller, webhooks, and local issuers are managed deterministically by the platform.

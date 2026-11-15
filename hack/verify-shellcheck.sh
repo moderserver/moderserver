@@ -19,10 +19,12 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
 log_info "Verifying shell scripts with ShellCheck (${SHELLCHECK_VERSION})..."
 
-mapfile -t SCRIPTS < <(find "${CORE_ROOT}/hack" "${CORE_ROOT}/bootstrap" "${CORE_ROOT}/os" "${CORE_ROOT}/platform" "${CORE_ROOT}/test" -type f -name "*.sh" -o -name "k3s-service")
+mapfile -t SCRIPTS < <(find "${CORE_ROOT}/hack" "${CORE_ROOT}/bootstrap" "${CORE_ROOT}/os" "${CORE_ROOT}/platform" "${CORE_ROOT}/test" -type f \( -name "*.sh" -o -name "*.start" -o -name "*-service" \))
 
 if [[ ${#SCRIPTS[@]} -gt 0 ]]; then
-  run_tool_or_docker shellcheck "${SHELLCHECK_IMAGE}" --severity=error "${SCRIPTS[@]}"
+  # SC2034 (unused variable) is excluded: OpenRC service files and the sourced
+  # hack/lib/common.sh define variables that are consumed outside the file.
+  run_tool_or_docker shellcheck "${SHELLCHECK_IMAGE}" --severity=warning --exclude=SC2034 "${SCRIPTS[@]}"
 fi
 
 log_pass "ShellCheck verification passed."

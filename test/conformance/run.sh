@@ -57,6 +57,14 @@ fi
 
 run_static_conformance() {
   local dir="$1"
+
+  # Charts are rendered once and the manifests shared by every check below
+  CONFORMANCE_RENDER_DIR=$(mktemp -d)
+  chmod 755 "${CONFORMANCE_RENDER_DIR}"
+  export CONFORMANCE_RENDER_DIR
+  # shellcheck disable=SC2064
+  trap "rm -rf '${CONFORMANCE_RENDER_DIR}'" EXIT
+
   log_info "=========================================================="
   log_info "  Running ModerServer Static Conformance on: ${dir}"
   log_info "=========================================================="

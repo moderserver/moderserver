@@ -1,2 +1,0 @@
-# Default values for cluster-issuers.
-# ClusterIssuers and Root CAs are managed deterministically by the platform.

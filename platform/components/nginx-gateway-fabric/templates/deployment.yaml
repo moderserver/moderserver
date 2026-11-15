@@ -21,26 +21,10 @@ spec:
     spec:
       serviceAccountName: nginx-gateway
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 101
-        runAsGroup: 1001
-        fsGroup: 1001
-        seccompProfile:
-          type: RuntimeDefault
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
-                  - key: kubernetes.io/os
-                    operator: In
-                    values:
-                      - linux
+        {{- include "common.security.pod" (dict "uid" 101 "gid" 1001) | nindent 8 }}
       containers:
         - name: nginx-gateway
-          image: "ghcr.io/moderserver/nginx-gateway-fabric:{{ .Chart.AppVersion }}"
+          image: {{ include "common.images.ref" (dict "ctx" . "name" "nginx-gateway-fabric") | quote }}
           imagePullPolicy: IfNotPresent
           args:
             - controller
@@ -70,8 +54,10 @@ spec:
                 fieldRef:
                   fieldPath: metadata.labels['app.kubernetes.io/instance']
             - name: IMAGE_NAME
-              value: "ghcr.io/moderserver/nginx-gateway-fabric:{{ .Chart.AppVersion }}"
+              value: {{ include "common.images.ref" (dict "ctx" . "name" "nginx-gateway-fabric") | quote }}
           ports:
+            - name: agent-grpc
+              containerPort: 8443
             - name: health
               containerPort: 9099
           readinessProbe:
@@ -80,13 +66,15 @@ spec:
               port: health
             initialDelaySeconds: 3
             periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 5
           securityContext:
-            {{- include "common.security.container" . | nindent 12 }}
-            runAsNonRoot: true
-            runAsUser: 101
-            runAsGroup: 1001
-            seccompProfile:
-              type: RuntimeDefault
+            {{- include "common.security.container" (dict "uid" 101 "gid" 1001) | nindent 12 }}
           resources:
             requests:
               cpu: 50m
@@ -100,17 +88,7 @@ spec:
             - name: nginx-agent-tls
               mountPath: /var/run/secrets/ngf
               readOnly: true
-      nodeSelector:
-        node-role.kubernetes.io/control-plane: "true"
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-          effect: NoSchedule
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule
+      {{- include "common.scheduling.controlPlane" . | nindent 6 }}
       volumes:
         - name: tmp
           emptyDir: {}

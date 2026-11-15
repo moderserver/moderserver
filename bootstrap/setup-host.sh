@@ -13,6 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Turns an Alpine Linux root filesystem into a ModerServer host.
+#
+#   setup-host.sh                       Configure the running Alpine system
+#   setup-host.sh --root /mnt           Configure a root filesystem mounted at /mnt
+#                                       (used by the installer, see os/overlay)
+#   setup-host.sh --offline-repo DIR    Install packages from local apk repositories
+#                                       only (repeatable; no network access)
+#
+# Every step is required: the script stops at the first failure instead of
+# reporting success on a half-configured host.
+
 set -eu
 
 # renovate: datasource=github-releases depName=k3s-io/k3s
@@ -22,107 +33,192 @@ K3S_VERSION="${K3S_VERSION:-${DEFAULT_K3S_VERSION}}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CORE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "==> Configuring Alpine Linux host for ModerServer..."
+ROOT=""
+OFFLINE_REPOS=""
 
-# 1. Install prerequisites, firmware & hardware drivers
-echo "--> Installing host networking, hardware firmware, and tools..."
-apk update || true
-apk add --no-cache \
-  curl \
-  ca-certificates \
-  iptables \
-  ebtables \
-  ip6tables \
-  cgroup-tools \
-  wireguard-tools \
-  chrony \
-  acpid \
-  zram-init \
-  linux-firmware-realtek \
-  linux-firmware-intel \
-  intel-media-driver \
-  libva-intel-driver || true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --root)
+      ROOT="${2%/}"
+      shift 2
+      ;;
+    --offline-repo)
+      OFFLINE_REPOS="${OFFLINE_REPOS} $2"
+      shift 2
+      ;;
+    -h|--help)
+      sed -n '16,24p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 
-# 2. Kernel modules configuration (CNI, WireGuard, Intel QuickSync, ZRAM)
+# Run a command inside the target root filesystem
+in_root() {
+  if [ -z "${ROOT}" ]; then
+    "$@"
+  else
+    chroot "${ROOT}" "$@"
+  fi
+}
+
+# enable_service <service> <runlevel>
+enable_service() {
+  if [ ! -e "${ROOT}/etc/init.d/$1" ]; then
+    echo "Service '$1' is not installed in ${ROOT:-/}" >&2
+    exit 1
+  fi
+  if [ ! -L "${ROOT}/etc/runlevels/$2/$1" ]; then
+    in_root rc-update add "$1" "$2"
+  fi
+}
+
+echo "==> Configuring Alpine Linux host for ModerServer (root: ${ROOT:-/})..."
+
+# 1. Package repositories: a host installed from the offline installer has no
+#    remote repository yet, and needs one for later GitOps-driven OS upgrades.
+if ! grep -q -E '^https?://' "${ROOT}/etc/apk/repositories" 2>/dev/null; then
+  ALPINE_BRANCH="$(cut -d. -f1,2 "${ROOT}/etc/alpine-release")"
+  echo "--> Pointing package repositories at Alpine v${ALPINE_BRANCH}..."
+  cat << EOF_REPOS > "${ROOT}/etc/apk/repositories"
+https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/main
+https://dl-cdn.alpinelinux.org/alpine/v${ALPINE_BRANCH}/community
+EOF_REPOS
+fi
+
+# 2. Host packages (networking, firmware and tools)
+echo "--> Installing host packages..."
+PACKAGES="$(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "${SCRIPT_DIR}/host-packages" | tr '\n' ' ')"
+if [ -n "${OFFLINE_REPOS}" ]; then
+  REPO_ARGS="--no-network --repositories-file /dev/null"
+  for repo in ${OFFLINE_REPOS}; do
+    REPO_ARGS="${REPO_ARGS} --repository ${repo}"
+  done
+  # shellcheck disable=SC2086
+  apk add --root "${ROOT:-/}" ${REPO_ARGS} ${PACKAGES}
+else
+  # shellcheck disable=SC2086
+  apk add --root "${ROOT:-/}" --update-cache ${PACKAGES}
+fi
+
+# 3. Kernel modules (container networking, WireGuard)
 echo "--> Enabling required kernel modules..."
-mkdir -p /etc/modules-load.d
-cat << 'EOF' > /etc/modules-load.d/k8s.conf
+mkdir -p "${ROOT}/etc/modules-load.d"
+cat << 'EOF_MODULES' > "${ROOT}/etc/modules-load.d/moderserver.conf"
 overlay
 br_netfilter
 wireguard
-i915
-zram
-EOF
-modprobe -q overlay || true
-modprobe -q br_netfilter || true
-modprobe -q wireguard || true
-modprobe -q i915 || true
-modprobe -q zram || true
+EOF_MODULES
 
-# 3. Configure ZRAM Memory Swap (2GB compressed in-RAM safety buffer for 4GB hardware)
-echo "--> Configuring ZRAM compressed swap buffer..."
-mkdir -p /etc/conf.d
-cat << 'EOF' > /etc/conf.d/zram-init
+# 4. ZRAM compressed swap (2GB in-RAM safety buffer for 4GB hardware)
+echo "--> Configuring ZRAM compressed swap..."
+cat << 'EOF_ZRAM' > "${ROOT}/etc/conf.d/zram-init"
+load_on_start=yes
+unload_on_stop=yes
 num_devices=1
 type0=swap
 size0=2048
 algo0=lz4
-EOF
-rc-update add zram-init boot || true
-
-# 4. Configure ACPI for graceful hardware power-button shutdown
-rc-update add acpid boot || true
+labl0=zram_swap
+EOF_ZRAM
 
 # 5. Kernel sysctl tuning
-echo "--> Applying hardened sysctl parameters..."
-cp "${CORE_ROOT}/os/sysctl.d/99-moderserver.conf" /etc/sysctl.d/99-moderserver.conf
-sysctl -p /etc/sysctl.d/99-moderserver.conf || true
+echo "--> Installing hardened sysctl parameters..."
+mkdir -p "${ROOT}/etc/sysctl.d"
+cp "${CORE_ROOT}/os/sysctl.d/99-moderserver.conf" "${ROOT}/etc/sysctl.d/99-moderserver.conf"
 
-# 6. Configure bootloader for cgroups v2
-if [ -f /etc/default/extlinux.conf ] || [ -f /etc/update-extlinux.conf ]; then
-  echo "--> Ensuring cgroup memory and cpuset are enabled in extlinux..."
-  if ! grep -q "cgroup_enable=cpuset" /etc/update-extlinux.conf 2>/dev/null; then
-    sed -i 's/^default_kernel_opts="/default_kernel_opts="cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory /' /etc/update-extlinux.conf 2>/dev/null || true
-    update-extlinux || true
-  fi
-fi
+# 6. K3s configuration
+echo "--> Installing K3s configuration..."
+mkdir -p "${ROOT}/etc/rancher/k3s"
+for file in config.yaml kubelet.config pod-security.yaml; do
+  cp "${SCRIPT_DIR}/${file}" "${ROOT}/etc/rancher/k3s/${file}"
+  chmod 600 "${ROOT}/etc/rancher/k3s/${file}"
+done
 
-# 7. Install K3s configuration
-echo "--> Setting up K3s configuration..."
-mkdir -p /etc/rancher/k3s
-cp "${SCRIPT_DIR}/config.yaml" /etc/rancher/k3s/config.yaml
-cp "${SCRIPT_DIR}/kubelet.config" /etc/rancher/k3s/kubelet.config
-chmod 600 /etc/rancher/k3s/config.yaml /etc/rancher/k3s/kubelet.config
-
-# 8. Download or install pinned K3s binary
+# 7. Pinned K3s binary: shipped next to this script by the installer image,
+#    otherwise downloaded and verified against the release checksums.
 echo "--> Installing K3s binary (${K3S_VERSION})..."
+mkdir -p "${ROOT}/usr/local/bin"
 if [ -f "${SCRIPT_DIR}/k3s" ]; then
-  cp "${SCRIPT_DIR}/k3s" /usr/local/bin/k3s
+  cp "${SCRIPT_DIR}/k3s" "${ROOT}/usr/local/bin/k3s"
 else
-  ARCH=$(uname -m)
-  case "$ARCH" in
-    x86_64) K3S_ARCH="amd64" ;;
-    aarch64) K3S_ARCH="arm64" ;;
-    *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+  ARCH="$(uname -m)"
+  case "${ARCH}" in
+    x86_64) K3S_ARCH="amd64"; K3S_BIN="k3s" ;;
+    aarch64) K3S_ARCH="arm64"; K3S_BIN="k3s-arm64" ;;
+    *) echo "Unsupported architecture: ${ARCH}" >&2; exit 1 ;;
   esac
-
-  K3S_BIN_URL="https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s"
-  if [ "$K3S_ARCH" = "arm64" ]; then
-    K3S_BIN_URL="https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}/k3s-arm64"
+  K3S_RELEASE_URL="https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION}"
+  K3S_TMP="$(mktemp -d)"
+  curl -sfL "${K3S_RELEASE_URL}/${K3S_BIN}" -o "${K3S_TMP}/${K3S_BIN}"
+  curl -sfL "${K3S_RELEASE_URL}/sha256sum-${K3S_ARCH}.txt" -o "${K3S_TMP}/sha256sum.txt"
+  EXPECTED_SHA="$(awk -v f="${K3S_BIN}" '$2 == f {print $1}' "${K3S_TMP}/sha256sum.txt")"
+  ACTUAL_SHA="$(sha256sum "${K3S_TMP}/${K3S_BIN}" | cut -d' ' -f1)"
+  if [ -z "${EXPECTED_SHA}" ] || [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
+    echo "K3s binary checksum mismatch (expected '${EXPECTED_SHA}', got '${ACTUAL_SHA}')" >&2
+    exit 1
   fi
-  curl -sfL "$K3S_BIN_URL" -o /usr/local/bin/k3s
+  cp "${K3S_TMP}/${K3S_BIN}" "${ROOT}/usr/local/bin/k3s"
+  rm -rf "${K3S_TMP}"
 fi
-chmod 755 /usr/local/bin/k3s
+chmod 755 "${ROOT}/usr/local/bin/k3s"
 
-# 9. Install OpenRC service
-echo "--> Installing K3s OpenRC service..."
-cp "${SCRIPT_DIR}/k3s-service" /etc/init.d/k3s
-chmod 755 /etc/init.d/k3s
-rc-update add cgroups boot || true
-rc-update add k3s default || true
+# 8. Pre-baked platform container images (imported by K3s at start)
+if [ -d "${SCRIPT_DIR}/images" ]; then
+  echo "--> Staging pre-baked platform container images..."
+  mkdir -p "${ROOT}/var/lib/rancher/k3s/agent/images"
+  cp "${SCRIPT_DIR}/images"/*.tar "${ROOT}/var/lib/rancher/k3s/agent/images/"
+fi
 
-# 10. Lock down root account password login (system security)
-echo "--> Locking down root password login..."
-passwd -l root >/dev/null 2>&1 || true
+# 9. Node configuration and GitOps bootstrap
+echo "--> Installing ModerServer node configuration..."
+mkdir -p "${ROOT}/etc/moderserver"
+if [ ! -f "${ROOT}/etc/moderserver/moderserver.conf" ]; then
+  cp "${SCRIPT_DIR}/moderserver.conf" "${ROOT}/etc/moderserver/moderserver.conf"
+fi
+
+mkdir -p "${ROOT}/usr/local/sbin"
+cp "${SCRIPT_DIR}/moderserver-bootstrap.sh" "${ROOT}/usr/local/sbin/moderserver-bootstrap"
+chmod 755 "${ROOT}/usr/local/sbin/moderserver-bootstrap"
+
+GITOPS_BOOTSTRAP="false"
+if [ -d "${SCRIPT_DIR}/manifests" ]; then
+  echo "--> Installing GitOps bootstrap manifests..."
+  mkdir -p "${ROOT}/usr/share/moderserver/bootstrap"
+  cp "${SCRIPT_DIR}/manifests"/*.yaml "${ROOT}/usr/share/moderserver/bootstrap/"
+  GITOPS_BOOTSTRAP="true"
+else
+  echo "--> No GitOps bootstrap manifests next to this script: K3s is installed"
+  echo "    without the platform. Build them with 'make build-image' (see os/build-image.sh)."
+fi
+
+# 10. OpenRC services
+echo "--> Installing OpenRC services..."
+cp "${SCRIPT_DIR}/k3s-service" "${ROOT}/etc/init.d/k3s"
+cp "${SCRIPT_DIR}/moderserver-bootstrap-service" "${ROOT}/etc/init.d/moderserver-bootstrap"
+chmod 755 "${ROOT}/etc/init.d/k3s" "${ROOT}/etc/init.d/moderserver-bootstrap"
+
+enable_service cgroups boot
+enable_service zram-init boot
+enable_service acpid default
+enable_service chronyd default
+enable_service k3s default
+if [ "${GITOPS_BOOTSTRAP}" = "true" ]; then
+  enable_service moderserver-bootstrap default
+fi
+
+# 11. No password logins: the node is managed through GitOps and the Kubernetes API
+echo "--> Locking root password login..."
+in_root passwd -l root >/dev/null
+
+# 12. Apply kernel settings immediately when configuring the running system
+if [ -z "${ROOT}" ]; then
+  modprobe -a overlay br_netfilter wireguard
+  sysctl -q -p /etc/sysctl.d/99-moderserver.conf
+fi
 
 echo "==> [PASS] Host preparation completed successfully."
