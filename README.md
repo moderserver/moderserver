@@ -53,7 +53,7 @@ make stop-qemu
 # Install and boot with UEFI firmware instead of BIOS
 FIRMWARE=uefi make run-qemu
 
-# Run Static Conformance against platform components
+# Run Static Conformance against platform components (inside the conformance image)
 make test-conformance
 
 # Run live Runtime Conformance against deployed platform

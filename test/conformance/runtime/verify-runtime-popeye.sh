@@ -16,8 +16,7 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
-require_tool docker
-require_tool kubectl
+require_tool popeye
 
 NAMESPACE="${1:-default}"
 SELECTOR="${2:-}"
@@ -27,25 +26,15 @@ if [[ -n "${SELECTOR}" ]]; then
   EXTRA_ARGS+=("-l" "${SELECTOR}")
 fi
 
-# Dump the current config
-TMP_KUBECONFIG=$(mktemp)
-kubectl config view --raw > "${TMP_KUBECONFIG}"
-chmod 644 "${TMP_KUBECONFIG}"
-trap 'rm -f "${TMP_KUBECONFIG}"' EXIT
-
 NAMESPACE_ARGS=("--namespace" "${NAMESPACE}")
 if [[ "${NAMESPACE}" == "all" || "${NAMESPACE}" == "--all-namespaces" || -z "${NAMESPACE}" ]]; then
   NAMESPACE_ARGS=("-A")
 fi
 
-log_info "[Conformance:Runtime] Sanitizing active namespace '${NAMESPACE}' with popeye (${POPEYE_VERSION})..."
+log_info "[Conformance:Runtime] Sanitizing active namespace '${NAMESPACE}' with popeye..."
 
-docker run --rm \
-  --net=host \
-  -v "${TMP_KUBECONFIG}:/tmp/kubeconfig" \
-  -e KUBECONFIG=/tmp/kubeconfig \
-  "${POPEYE_IMAGE}" \
-  --kubeconfig /tmp/kubeconfig \
+# Uses the cluster KUBECONFIG points at
+popeye \
   "${NAMESPACE_ARGS[@]}" \
   "${EXTRA_ARGS[@]}" \
   --min-score 70 \

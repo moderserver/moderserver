@@ -18,9 +18,11 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
+require_tool kubeconform
+
 TARGET_DIR="${1:-.}"
 
-log_info "[Conformance:Static] Validating K8s OpenAPI schemas with kubeconform (${KUBECONFORM_VERSION}, K8s ${K8S_TARGET_VERSION})..."
+log_info "[Conformance:Static] Validating K8s OpenAPI schemas with kubeconform (K8s ${K8S_TARGET_VERSION})..."
 
 render_charts "${TARGET_DIR}"
 if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
@@ -29,7 +31,7 @@ if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
 fi
 
 for MANIFEST in "${MANIFESTS[@]}"; do
-  run_tool_or_docker kubeconform "${KUBECONFORM_IMAGE}" \
+  kubeconform \
     -summary -strict -ignore-missing-schemas -kubernetes-version "${K8S_TARGET_VERSION}" \
     -schema-location default \
     -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \

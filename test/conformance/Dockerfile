@@ -52,6 +52,7 @@ RUN apk add --no-cache \
       py3-pip \
       helm \
       docker-cli \
+      docker-cli-buildx \
       bind-tools
 
 # renovate: datasource=pypi depName=yamllint

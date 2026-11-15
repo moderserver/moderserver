@@ -17,10 +17,11 @@ set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
 require_tool docker
+require_tool trivy
 
 TARGET_DIR="${1:-.}"
 
-log_info "[Conformance:Static] Scanning container images for CVE vulnerabilities with trivy (${TRIVY_VERSION})..."
+log_info "[Conformance:Static] Scanning container images for CVE vulnerabilities with trivy..."
 
 DOCKERFILES=$(find "${TARGET_DIR}" -type f -name "Dockerfile*" ! -name "*.dockerignore" 2>/dev/null || true)
 if [[ -z "${DOCKERFILES}" ]]; then
@@ -44,7 +45,7 @@ for df in ${DOCKERFILES}; do
   fi
 
   log_info "Scanning image: ${IMAGE_TAG}"
-  run_tool_or_docker trivy "${TRIVY_IMAGE}" image --scanners vuln --exit-code 1 --severity CRITICAL,HIGH "${IMAGE_TAG}"
+  trivy image --scanners vuln --exit-code 1 --severity CRITICAL,HIGH "${IMAGE_TAG}"
   log_pass "trivy vulnerability scan passed for: ${COMPONENT_NAME}"
 done
 

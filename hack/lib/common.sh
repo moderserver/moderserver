@@ -30,37 +30,9 @@ ACTIONLINT_IMAGE="rhysd/actionlint:${ACTIONLINT_VERSION}"
 GITLEAKS_VERSION="v8.30.1"
 GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:${GITLEAKS_VERSION}"
 
-# renovate: datasource=docker depName=hadolint/hadolint
-HADOLINT_VERSION="v2.15.1"
-HADOLINT_IMAGE="hadolint/hadolint:${HADOLINT_VERSION}"
-
-# renovate: datasource=docker depName=stackrox/kube-linter
-KUBE_LINTER_VERSION="v0.8.3"
-KUBE_LINTER_IMAGE="stackrox/kube-linter:${KUBE_LINTER_VERSION}"
-
-# renovate: datasource=docker depName=quay.io/kubescape/kubescape-cli
-KUBESCAPE_VERSION="v4.0.20"
-KUBESCAPE_IMAGE="quay.io/kubescape/kubescape-cli:${KUBESCAPE_VERSION}"
-
-# renovate: datasource=github-releases depName=FairwindsOps/polaris
-POLARIS_VERSION="v10.2.6"
-POLARIS_IMAGE="us-docker.pkg.dev/fairwinds-ops/oss/polaris:${POLARIS_VERSION}"
-
-# renovate: datasource=docker depName=derailed/popeye
-POPEYE_VERSION="v0.22.1"
-POPEYE_IMAGE="derailed/popeye:${POPEYE_VERSION}"
-
 # renovate: datasource=docker depName=koalaman/shellcheck
 SHELLCHECK_VERSION="v0.11.0"
 SHELLCHECK_IMAGE="koalaman/shellcheck:${SHELLCHECK_VERSION}"
-
-# renovate: datasource=docker depName=aquasec/trivy
-TRIVY_VERSION="0.76.2"
-TRIVY_IMAGE="aquasec/trivy:${TRIVY_VERSION}"
-
-# renovate: datasource=docker depName=ghcr.io/yannh/kubeconform
-KUBECONFORM_VERSION="v0.8.0"
-KUBECONFORM_IMAGE="ghcr.io/yannh/kubeconform:${KUBECONFORM_VERSION}"
 
 # renovate: datasource=docker depName=renovate/renovate
 RENOVATE_VERSION="44.239.1"
@@ -114,6 +86,9 @@ require_tool() {
 
 # Registry all platform component images are published to
 REGISTRY="${REGISTRY:-ghcr.io/moderserver}"
+
+# Conformance suite image: the single toolchain every conformance check runs in
+CONFORMANCE_IMAGE="${CONFORMANCE_IMAGE:-${REGISTRY}/conformance:latest}"
 
 # component_image_tag <component_dir>
 #
@@ -176,6 +151,39 @@ use_test_cluster() {
   "${HACK_DIR}/run-qemu.sh" --wait
   KUBECONFIG=$("${HACK_DIR}/run-qemu.sh" --kubeconfig)
   export KUBECONFIG
+}
+
+# run_conformance <extra docker run arguments...> -- <conformance suite arguments...>
+#
+# Runs the conformance suite inside the conformance image, as the calling user
+# so files written to the mounted workspace keep their owner. The image is
+# built from the working tree first, unless CONFORMANCE_SKIP_BUILD=true (CI
+# loads the image built once for the whole pipeline).
+run_conformance() {
+  require_tool docker
+  if [[ "${CONFORMANCE_SKIP_BUILD:-false}" != "true" ]]; then
+    "${HACK_DIR}/build-conformance.sh" >/dev/null
+  fi
+
+  local docker_args=()
+  while [[ $# -gt 0 && "$1" != "--" ]]; do
+    docker_args+=("$1")
+    shift
+  done
+  shift
+
+  # Scanner databases are cached between runs
+  local cache_dir="${OUTPUT_DIR}/conformance-cache"
+  mkdir -p "${cache_dir}"
+
+  docker run --rm \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp \
+    -e USER=conformance \
+    -e TRIVY_CACHE_DIR=/cache/trivy \
+    -v "${cache_dir}:/cache" \
+    "${docker_args[@]}" \
+    "${CONFORMANCE_IMAGE}" "$@"
 }
 
 # build_chart_dependencies <chart_dir>

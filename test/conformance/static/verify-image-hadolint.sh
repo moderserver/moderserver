@@ -17,9 +17,11 @@ set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
 
+require_tool hadolint
+
 TARGET_DIR="${1:-.}"
 
-log_info "[Conformance:Static] Checking Dockerfiles with hadolint (${HADOLINT_VERSION})..."
+log_info "[Conformance:Static] Checking Dockerfiles with hadolint..."
 
 DOCKERFILES=$(find "${TARGET_DIR}" -type f -name "Dockerfile*" ! -name "*.dockerignore" 2>/dev/null || true)
 if [[ -z "${DOCKERFILES}" ]]; then
@@ -29,7 +31,7 @@ fi
 
 for df in ${DOCKERFILES}; do
   log_info "Linting: ${df}"
-  run_tool_or_docker hadolint "${HADOLINT_IMAGE}" hadolint --failure-threshold error "${df}"
+  hadolint --failure-threshold error "${df}"
 done
 
 log_pass "Dockerfile conformance verified."

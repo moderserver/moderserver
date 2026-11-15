@@ -18,9 +18,11 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
+require_tool kubescape
+
 TARGET_DIR="${1:-.}"
 
-log_info "[Conformance:Static] Auditing NSA-CISA compliance with kubescape (${KUBESCAPE_VERSION})..."
+log_info "[Conformance:Static] Auditing NSA-CISA compliance with kubescape..."
 
 render_charts "${TARGET_DIR}"
 if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
@@ -34,7 +36,7 @@ for MANIFEST in "${MANIFESTS[@]}"; do
   # the report, then require either a result summary or the explicit
   # "nothing to scan" message so a crashed scan is never read as a pass.
   SCAN_STATUS=0
-  SCAN_OUTPUT=$(run_tool_or_docker kubescape "${KUBESCAPE_IMAGE}" scan framework nsa "${MANIFEST}" --severity-threshold high 2>&1) || SCAN_STATUS=$?
+  SCAN_OUTPUT=$(kubescape scan framework nsa "${MANIFEST}" --severity-threshold high 2>&1) || SCAN_STATUS=$?
   if echo "${SCAN_OUTPUT}" | grep -q "no resources found to scan"; then
     log_info "No standard workload resources in ${APP_NAME} to scan with kubescape, skipping."
   elif echo "${SCAN_OUTPUT}" | grep -E -q "│ *(Critical|High) │ [1-9]"; then

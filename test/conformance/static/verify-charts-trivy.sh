@@ -18,9 +18,11 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
+require_tool trivy
+
 TARGET_DIR="${1:-.}"
 
-log_info "[Conformance:Static] Auditing chart security with trivy config (${TRIVY_VERSION})..."
+log_info "[Conformance:Static] Auditing chart security with trivy config..."
 
 render_charts "${TARGET_DIR}"
 if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
@@ -29,7 +31,7 @@ if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
 fi
 
 for MANIFEST in "${MANIFESTS[@]}"; do
-  run_tool_or_docker trivy "${TRIVY_IMAGE}" config --exit-code 1 --severity CRITICAL,HIGH "${MANIFEST}"
+  trivy config --exit-code 1 --severity CRITICAL,HIGH "${MANIFEST}"
 done
 
 log_pass "trivy config audit verified."

@@ -24,7 +24,7 @@ if [[ "${1:-}" == "--push" ]]; then
   PUSH="true"
 fi
 
-IMAGE_TAG="${REGISTRY:-ghcr.io/moderserver}/conformance:${CONFORMANCE_TAG:-latest}"
+IMAGE_TAG="${CONFORMANCE_IMAGE}"
 
 log_info "Building ModerServer Conformance container image (${IMAGE_TAG})..."
 

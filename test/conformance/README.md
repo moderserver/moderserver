@@ -39,32 +39,38 @@ A finding is never silenced without a written reason:
 
 ## Usage
 
-### Local Execution
+Every check runs inside the conformance image (`test/conformance/Dockerfile`),
+which pins the whole toolchain. Nothing but Docker is needed on the host, and
+the result is the same on a laptop and in CI.
 
-From the root of the repository:
+### From this repository
 
 ```bash
-# Run Static Conformance against a specific component or application
-./test/conformance/run.sh --static platform/components/upgrade
-./test/conformance/run.sh --static platform/components/gateway-api
+# Static Conformance of all platform components, or of one
+make test-conformance
+make test-conformance COMPONENT=cert-manager
 
-# Run Runtime Conformance against an active cluster namespace
-./test/conformance/run.sh --runtime moderserver-system
-
-# Run complete verification (Static + Runtime)
-./test/conformance/run.sh --all platform/components/upgrade moderserver-system
+# Runtime Conformance: installs a QEMU machine, or uses the cluster KUBECONFIG points at
+make test-conformance-runtime
 ```
 
-### Containerized Execution
+Both targets build the image from the working tree first, so a change to a
+check or to a tool version is exercised immediately.
 
-The suite can also run as a container without installing local tools:
+### From another repository
 
 ```bash
-# Build the conformance image
-make build-conformance
-
-# Run static checks via container
+# Static checks of a chart directory. The Docker socket lets the suite build
+# and scan the images of the Dockerfiles it finds.
 docker run --rm \
+  --user "$(id -u):$(id -g)" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+  -e HOME=/tmp -e USER=conformance \
   -v "$(pwd):/workspace" \
-  ghcr.io/moderserver/conformance:latest --static platform/components/gateway-api
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  ghcr.io/moderserver/conformance:latest --static path/to/chart
+
+# Runtime checks of a namespace of a running cluster
+docker run --rm --net=host \
+  -v "${KUBECONFIG}:/tmp/kubeconfig:ro" -e KUBECONFIG=/tmp/kubeconfig \
+  ghcr.io/moderserver/conformance:latest --runtime my-namespace
 ```

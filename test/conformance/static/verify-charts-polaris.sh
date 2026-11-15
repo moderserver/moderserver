@@ -18,9 +18,11 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
+require_tool polaris
+
 TARGET_DIR="${1:-.}"
 
-log_info "[Conformance:Static] Auditing deployment scoring with polaris (${POLARIS_VERSION})..."
+log_info "[Conformance:Static] Auditing deployment scoring with polaris..."
 
 render_charts "${TARGET_DIR}"
 if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
@@ -29,7 +31,7 @@ if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
 fi
 
 for MANIFEST in "${MANIFESTS[@]}"; do
-  run_tool_or_docker polaris "${POLARIS_IMAGE}" polaris audit \
+  polaris audit \
     --audit-path "${MANIFEST}" \
     --set-exit-code-on-danger \
     --format pretty

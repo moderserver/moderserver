@@ -16,16 +16,10 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
-require_tool docker
-require_tool kubectl
+require_tool trivy
 require_tool python3
 
 NAMESPACE="${1:-default}"
-SELECTOR="${2:-}"
-
-TMP_KUBECONFIG=$(mktemp)
-kubectl config view --raw > "${TMP_KUBECONFIG}"
-chmod 644 "${TMP_KUBECONFIG}"
 
 EXCEPTIONS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/exceptions"
 
@@ -36,18 +30,13 @@ else
   NAMESPACE_ARGS=("--exclude-namespaces" "kube-system,kube-public,kube-node-lease")
 fi
 
-log_info "[Conformance:Runtime] Auditing live cluster security with trivy k8s (${TRIVY_VERSION}) in namespace '${NAMESPACE}'..."
+log_info "[Conformance:Runtime] Auditing live cluster security with trivy k8s in namespace '${NAMESPACE}'..."
 
 REPORT=$(mktemp)
-trap 'rm -f "${TMP_KUBECONFIG}" "${REPORT}"' EXIT
+trap 'rm -f "${REPORT}"' EXIT
 
-docker run --rm \
-  --net=host \
-  -v "${TMP_KUBECONFIG}:/tmp/kubeconfig" \
-  -e KUBECONFIG=/tmp/kubeconfig \
-  "${TRIVY_IMAGE}" \
-  k8s \
-  --kubeconfig /tmp/kubeconfig \
+# Uses the cluster KUBECONFIG points at
+trivy k8s \
   "${NAMESPACE_ARGS[@]}" \
   --report all \
   --format json \

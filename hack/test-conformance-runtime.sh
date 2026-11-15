@@ -18,6 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 require_tool kubectl
+require_tool docker
 
 NAMESPACE="${1:-all}"
 
@@ -25,6 +26,16 @@ NAMESPACE="${1:-all}"
 use_test_cluster
 
 log_info "Executing Runtime Conformance analysis on namespace '${NAMESPACE}'..."
-"${CORE_ROOT}/test/conformance/run.sh" --runtime "${NAMESPACE}"
+# Host networking: the kubeconfig of a QEMU machine points at a forwarded
+# port on 127.0.0.1
+KUBECONFIG_COPY=$(mktemp)
+kubectl config view --raw > "${KUBECONFIG_COPY}"
+chmod 644 "${KUBECONFIG_COPY}"
+run_conformance \
+  --net=host \
+  -v "${KUBECONFIG_COPY}:/tmp/kubeconfig:ro" \
+  -e KUBECONFIG=/tmp/kubeconfig \
+  -- --runtime "${NAMESPACE}"
+rm -f "${KUBECONFIG_COPY}"
 
 log_pass "Runtime Conformance verification completed successfully."

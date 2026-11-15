@@ -18,9 +18,11 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../hack" && pwd)/lib/common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
+require_tool kube-linter
+
 TARGET_DIR="${1:-.}"
 
-log_info "[Conformance:Static] Auditing manifest best practices with kube-linter (${KUBE_LINTER_VERSION})..."
+log_info "[Conformance:Static] Auditing manifest best practices with kube-linter..."
 
 render_charts "${TARGET_DIR}"
 if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
@@ -29,7 +31,7 @@ if [[ ${#MANIFESTS[@]} -eq 0 ]]; then
 fi
 
 for MANIFEST in "${MANIFESTS[@]}"; do
-  run_tool_or_docker kube-linter "${KUBE_LINTER_IMAGE}" lint "${MANIFEST}"
+  kube-linter lint "${MANIFEST}"
 done
 
 log_pass "kube-linter verification verified."

@@ -49,7 +49,7 @@ jobs:
 
   conformance-static:
     name: Conformance Static (${{ matrix.component }})
-    needs: detect-components
+    needs: [detect-components, build-conformance]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -59,13 +59,19 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v7
 
-      - name: Set up Helm
-        uses: azure/setup-helm@v5
+      - name: Download Conformance Image
+        uses: actions/download-artifact@v8
         with:
-          # renovate: datasource=github-releases depName=helm/helm
-          version: "v4.3.1"
+          name: moderserver-conformance-image
+          path: _output
+
+      - name: Load Conformance Image
+        run: |
+          docker load -i _output/conformance.tar
 
       - name: Run Static Conformance
+        env:
+          CONFORMANCE_SKIP_BUILD: "true"
         run: |
           make test-conformance COMPONENT=${{ matrix.component }}
 
@@ -90,31 +96,28 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # The conformance image is the toolchain every conformance job runs in. It is
+  # built once here, used by those jobs, and published by the promote job.
   build-conformance:
     name: Build (Conformance Image)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build Conformance Container Image
         run: |
-          PUSH_FLAG=""
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            PUSH_FLAG="--push"
-          fi
-          ./hack/build-conformance.sh ${PUSH_FLAG}
+          ./hack/build-conformance.sh
+          mkdir -p _output
+          docker save ghcr.io/moderserver/conformance:latest -o _output/conformance.tar
+
+      - name: Upload Conformance Image Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: moderserver-conformance-image
+          path: _output/conformance.tar
+          retention-days: 1
+          if-no-files-found: error
 
   build:
     name: Build (OS Image)
@@ -183,7 +186,7 @@ jobs:
 
   conformance-runtime:
     name: Conformance (Runtime Analysis)
-    needs: [conformance-static, build]
+    needs: [conformance-static, build, build-conformance]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -210,7 +213,19 @@ jobs:
           name: moderserver-installer-iso
           path: _output
 
+      - name: Download Conformance Image
+        uses: actions/download-artifact@v8
+        with:
+          name: moderserver-conformance-image
+          path: _output
+
+      - name: Load Conformance Image
+        run: |
+          docker load -i _output/conformance.tar
+
       - name: Run Runtime Conformance Analysis
+        env:
+          CONFORMANCE_SKIP_BUILD: "true"
         run: |
           make test-conformance-runtime
 
@@ -251,6 +266,17 @@ jobs:
       - name: Publish Tested Platform Images
         run: |
           ./hack/push-components.sh _output/images
+
+      - name: Download Conformance Image
+        uses: actions/download-artifact@v8
+        with:
+          name: moderserver-conformance-image
+          path: _output
+
+      - name: Publish Conformance Image
+        run: |
+          docker load -i _output/conformance.tar
+          docker push ghcr.io/moderserver/conformance:latest
 
       - name: Advance stable Branch
         run: |
