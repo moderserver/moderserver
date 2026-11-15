@@ -1,0 +1,45 @@
+# ModerServer root GitOps Application
+# Installed at /usr/share/moderserver/bootstrap/root-application.yaml
+#
+# The one piece of GitOps configuration that cannot come from Git: it says
+# which Git repository the node follows. moderserver-bootstrap applies it at
+# every boot, after replacing the ${...} placeholders with the values of
+# /etc/moderserver/moderserver.conf. Argo CD then reconciles every platform
+# component from platform/system in that repository.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: "${GITOPS_REPO_URL}"
+    targetRevision: "${GITOPS_REVISION}"
+    path: platform/system
+    helm:
+      releaseName: moderserver-platform
+      valuesObject:
+        global:
+          domain: "${DOMAIN}"
+        gitops:
+          repoURL: "${GITOPS_REPO_URL}"
+          targetRevision: "${GITOPS_REVISION}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

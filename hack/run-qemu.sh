@@ -208,7 +208,11 @@ snapshot_working_tree() {
   local parent local_tree local_commit
   parent=$(GIT_DIR="${mirror}" git rev-parse --verify --quiet "refs/heads/${GITOPS_REVISION}" || GIT_DIR="${mirror}" git rev-parse HEAD)
   local_tree=$(GIT_DIR="${mirror}" GIT_INDEX_FILE="${tmp_git_idx}" git --work-tree="${CORE_ROOT}" add -A && GIT_DIR="${mirror}" GIT_INDEX_FILE="${tmp_git_idx}" git write-tree)
-  local_commit=$(GIT_DIR="${mirror}" git commit-tree "${local_tree}" -p "${parent}" -m "ModerServer Local Dev Snapshot")
+  # The snapshot commit only lives in the throwaway mirror: give it a fixed
+  # identity so it works on machines with no Git identity configured (CI runners)
+  local_commit=$(GIT_DIR="${mirror}" git \
+    -c user.name="ModerServer Dev Snapshot" -c user.email="dev-snapshot@moderserver.invalid" \
+    commit-tree "${local_tree}" -p "${parent}" -m "ModerServer Local Dev Snapshot")
   rm -f "${tmp_git_idx}"
   GIT_DIR="${mirror}" git update-ref "refs/heads/${GITOPS_REVISION}" "${local_commit}"
 }

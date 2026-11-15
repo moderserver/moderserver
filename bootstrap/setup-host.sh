@@ -190,6 +190,7 @@ if [ -d "${SCRIPT_DIR}/manifests" ]; then
   echo "--> Installing GitOps bootstrap manifests..."
   mkdir -p "${ROOT}/usr/share/moderserver/bootstrap"
   cp "${SCRIPT_DIR}/manifests"/*.yaml "${ROOT}/usr/share/moderserver/bootstrap/"
+  cp "${SCRIPT_DIR}/root-application.yaml" "${ROOT}/usr/share/moderserver/bootstrap/"
   GITOPS_BOOTSTRAP="true"
 else
   echo "--> No GitOps bootstrap manifests next to this script: K3s is installed"

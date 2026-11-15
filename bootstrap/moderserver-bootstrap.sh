@@ -19,9 +19,8 @@
 #   1. First boot only: installs Argo CD from the manifests shipped with the
 #      OS image. From then on Argo CD manages itself from Git and this script
 #      never touches it again, so the cluster has a single owner per resource.
-#   2. Every boot: applies the root Application generated from
-#      /etc/moderserver/moderserver.conf, the one piece of GitOps configuration
-#      that cannot come from Git (it says which Git repository to follow).
+#   2. Every boot: applies the root Application (root-application.yaml) filled
+#      in with the values of /etc/moderserver/moderserver.conf.
 
 set -eu
 
@@ -68,46 +67,17 @@ install_argocd() {
     apply -f "${MANIFESTS_DIR}/argocd.yaml"
 }
 
+# Escape a value for use as a sed replacement
+sed_value() {
+  printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
+}
+
 apply_root_application() {
-  apply -f - <<MANIFEST
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: root
-  namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-  source:
-    repoURL: "${GITOPS_REPO_URL}"
-    targetRevision: "${GITOPS_REVISION}"
-    path: platform/system
-    helm:
-      releaseName: moderserver-platform
-      valuesObject:
-        global:
-          domain: "${DOMAIN}"
-        gitops:
-          repoURL: "${GITOPS_REPO_URL}"
-          targetRevision: "${GITOPS_REVISION}"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: argocd
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    retry:
-      limit: 10
-      backoff:
-        duration: 10s
-        factor: 2
-        maxDuration: 3m
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-MANIFEST
+  sed \
+    -e "s|\${GITOPS_REPO_URL}|$(sed_value "${GITOPS_REPO_URL}")|g" \
+    -e "s|\${GITOPS_REVISION}|$(sed_value "${GITOPS_REVISION}")|g" \
+    -e "s|\${DOMAIN}|$(sed_value "${DOMAIN}")|g" \
+    "${MANIFESTS_DIR}/root-application.yaml" | apply -f -
 }
 
 DEV_REPO_URL="$(dev_option gitops-repo-url)"
